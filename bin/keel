@@ -3,6 +3,20 @@
 
 declare(strict_types=1);
 
+// Installed globally (`composer global require el-hendawy/keel`), `keel` runs the Keel version of the
+// project in the current directory when there is one, so every project uses the version it locked.
+$project = getcwd() . '/vendor/bin/keel';
+$self = realpath($_SERVER['SCRIPT_FILENAME'] ?? __FILE__) ?: __FILE__;
+if (getenv('KEEL_DELEGATED') === false && is_file($project) && realpath($project) !== $self && !str_starts_with($self, (string) realpath(getcwd() . '/vendor'))) {
+    putenv('KEEL_DELEGATED=1');
+    $arguments = [$project, ...array_slice($argv, 1)];
+    if (function_exists('pcntl_exec')) {
+        pcntl_exec(PHP_BINARY, $arguments); // replaces this process: signals reach the project's keel
+    }
+    passthru(escapeshellarg(PHP_BINARY) . ' ' . implode(' ', array_map('escapeshellarg', $arguments)), $code);
+    exit($code);
+}
+
 $candidates = [
     $GLOBALS['_composer_autoload_path'] ?? null,          // set by Composer's bin proxy
     getenv('COMPOSER_VENDOR_DIR') ? getenv('COMPOSER_VENDOR_DIR') . '/autoload.php' : null,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Keel\Auth;
 
+use Keel\Auth\Dpop\DpopVerifier;
 use Keel\Auth\Fingerprint\ClientFingerprint;
 use Keel\Auth\Fingerprint\Fingerprint;
 use Keel\Auth\Fingerprint\FingerprintMismatch;
@@ -23,7 +24,9 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * `Authorization: Bearer <token>` with Keel tokens (`keel_...`) or JWTs.
+ * `Authorization: Bearer <token>` (or `DPoP <token>` with a `DPoP:` proof) with Keel tokens
+ * (`keel_...`) or JWTs. A token bound to a DPoP key is only accepted with a valid proof from
+ * that key; presenting it as a plain Bearer token is refused.
  *
  * Every bound token is checked against the presenting client's fingerprint. In `enforce`
  * mode (the default) a mismatch is rejected and, unless `auth.fingerprint.revoke_on_mismatch`
@@ -38,6 +41,7 @@ final readonly class BearerAuthenticator implements Authenticator
         private TokenStore $store,
         private JwtTokens $jwt,
         private ClientFingerprint $fingerprints,
+        private DpopVerifier $dpop,
         private ClockInterface $clock,
         private RequestContext $context,
         private Scope $scope,
@@ -58,44 +62,58 @@ final readonly class BearerAuthenticator implements Authenticator
         if ($header === '') {
             return null;
         }
-        if (preg_match('/^Bearer\s+(\S+)$/i', $header, $match) !== 1) {
+        if (preg_match('/^(Bearer|DPoP)\s+(\S+)$/i', $header, $match) !== 1) {
             throw new Unauthorized('Send credentials as "Authorization: Bearer <token>".', headers: ['WWW-Authenticate' => 'Bearer realm="api"']);
         }
-        $token = $match[1];
+        $token = $match[2];
+        $jkt = strtolower($match[1]) === 'dpop' ? $this->dpop->verify($request, $token) : null;
 
-        return str_starts_with($token, Tokens::PREFIX) ? $this->opaque($token, $request) : $this->jwt($token, $request);
+        return str_starts_with($token, Tokens::PREFIX) ? $this->opaque($token, $request, $jkt) : $this->jwt($token, $request, $jkt);
     }
 
-    private function opaque(string $token, ServerRequestInterface $request): Principal
+    private function opaque(string $token, ServerRequestInterface $request, ?string $jkt): Principal
     {
         $now = $this->clock->now()->getTimestamp();
         $stored = $this->store->findByHash(Tokens::hash($token));
         if ($stored === null || !$stored->isActive($now)) {
             throw new Unauthorized('The token is invalid, expired or revoked.', headers: ['WWW-Authenticate' => 'Bearer error="invalid_token"']);
         }
+        $boundKey = $stored->fingerprint->dpop();
+        if ($boundKey !== null && $boundKey !== $jkt) {
+            throw self::needsProof();
+        }
         if ($this->binding) {
             $current = $this->fingerprints->of($request);
             if ($stored->bindOnFirstUse) {
-                if (!$this->store->bindOnFirstUse($stored->id, $current)) {
+                // The first client binds the token: to its fingerprint, and to its DPoP key if it sent a proof.
+                if (!$this->store->bindOnFirstUse($stored->id, $jkt === null ? $current : $current->with('dpop', $jkt))) {
                     $stored = $this->store->findByHash($stored->hash) ?? $stored; // bound concurrently
-                    $this->check($stored->fingerprint, $current, $stored);
+                    $this->check($stored->fingerprint->without('dpop'), $current, $stored);
                 }
             } else {
-                $this->check($stored->fingerprint, $current, $stored);
+                $this->check($stored->fingerprint->without('dpop'), $current, $stored);
             }
         }
 
         return $stored->principal();
     }
 
-    private function jwt(string $token, ServerRequestInterface $request): Principal
+    private function jwt(string $token, ServerRequestInterface $request, ?string $jkt): Principal
     {
-        ['principal' => $principal, 'binding' => $binding] = $this->jwt->verify($token);
+        ['principal' => $principal, 'binding' => $binding, 'jkt' => $boundKey] = $this->jwt->verify($token);
+        if ($boundKey !== null && $boundKey !== $jkt) {
+            throw self::needsProof();
+        }
         if ($this->binding && $binding !== null && !hash_equals($binding, $this->fingerprints->of($request)->digest())) {
             $this->mismatch($principal->tokenId ?? 'jwt', $principal, ['jwt'], false);
         }
 
         return $principal;
+    }
+
+    private static function needsProof(): Unauthorized
+    {
+        return new Unauthorized('This token is bound to a key: send it as "Authorization: DPoP <token>" with a DPoP proof signed by that key.', ['code' => 'invalid_dpop_proof'], headers: ['WWW-Authenticate' => 'DPoP error="invalid_token", algs="ES256 ES384 RS256"']);
     }
 
     private function check(Fingerprint $bound, Fingerprint $current, StoredToken $token): void

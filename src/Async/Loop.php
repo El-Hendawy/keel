@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Keel\Async;
 
 /**
- * A minimal event loop driving fibers: deferred callbacks, timers and curl_multi.
+ * A minimal event loop driving fibers: deferred callbacks, timers, socket readiness
+ * (stream_select) and curl_multi.
  *
  * The loop is the one piece of process-wide infrastructure that is deliberately
  * global, like the PHP engine itself. It holds no application state: every task it
@@ -30,6 +31,12 @@ final class Loop
     private array $curl = [];
 
     private bool $running = false;
+
+    /** @var array<int, array{0: resource, 1: \Closure(): void}> watcher id => [stream, callback] */
+    private array $readers = [];
+
+    /** @var array<int, array{0: resource, 1: \Closure(): void}> */
+    private array $writers = [];
 
     private function __construct()
     {
@@ -59,6 +66,45 @@ final class Loop
     public function cancelTimer(int $id): void
     {
         unset($this->timers[$id]);
+    }
+
+    /**
+     * Calls $callback every time $stream is readable, until cancelWatcher().
+     *
+     * @param resource $stream
+     * @param \Closure(): void $callback
+     */
+    public function onReadable($stream, \Closure $callback): int
+    {
+        $id = ++$this->nextTimerId;
+        $this->readers[$id] = [$stream, $callback];
+
+        return $id;
+    }
+
+    /**
+     * Calls $callback every time $stream is writable, until cancelWatcher().
+     *
+     * @param resource $stream
+     * @param \Closure(): void $callback
+     */
+    public function onWritable($stream, \Closure $callback): int
+    {
+        $id = ++$this->nextTimerId;
+        $this->writers[$id] = [$stream, $callback];
+
+        return $id;
+    }
+
+    public function cancelWatcher(int $id): void
+    {
+        unset($this->readers[$id], $this->writers[$id]);
+    }
+
+    /** True while the loop is being driven (by run(), or by a server's main loop). */
+    public function isRunning(): bool
+    {
+        return $this->running;
     }
 
     /** @param \Closure(\CurlHandle, int): void $onDone receives the handle and the CURLE_* result code */
@@ -117,7 +163,12 @@ final class Loop
             $timeout = max(0.0, $next - microtime(true));
         }
 
-        if ($this->curl !== []) {
+        if ($this->readers !== [] || $this->writers !== []) {
+            $this->pollStreams($this->curl !== [] ? min($timeout ?? 0.01, 0.01) : ($timeout ?? 1.0));
+            if ($this->curl !== []) {
+                $this->pollCurl(0.0);
+            }
+        } elseif ($this->curl !== []) {
             $this->pollCurl($timeout ?? 1.0);
         } elseif ($timeout !== null) {
             if ($timeout > 0) {
@@ -138,6 +189,30 @@ final class Loop
         }
 
         return true;
+    }
+
+    private function pollStreams(float $timeout): void
+    {
+        $read = array_map(static fn (array $w) => $w[0], $this->readers);
+        $write = array_map(static fn (array $w) => $w[0], $this->writers);
+        $except = [];
+        $readable = array_values($read);
+        $writable = array_values($write);
+        $seconds = (int) $timeout;
+        $micro = (int) (($timeout - $seconds) * 1e6);
+        if (@stream_select($readable, $writable, $except, $seconds, $micro) === false) {
+            return; // interrupted by a signal
+        }
+        foreach ($this->readers as $id => [$stream, $callback]) {
+            if (\in_array($stream, $readable, true) && \array_key_exists($id, $this->readers)) { // an earlier callback may have cancelled it
+                $callback();
+            }
+        }
+        foreach ($this->writers as $id => [$stream, $callback]) {
+            if (\in_array($stream, $writable, true) && \array_key_exists($id, $this->writers)) {
+                $callback();
+            }
+        }
     }
 
     private function pollCurl(float $timeout): void

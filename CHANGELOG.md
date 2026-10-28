@@ -3,6 +3,41 @@
 All notable changes are documented here. Until 1.0, minor versions may contain breaking changes; each one is
 listed under **Breaking** with an upgrade note.
 
+## 0.3.0 (unreleased)
+
+### Added
+
+- **`keel run`**: Keel's own HTTP/1.1 server. Many requests per process on the event loop (a fiber per
+  connection), keep-alive, chunked bodies, limits and timeouts, a supervisor that runs N processes on one
+  socket, restarts crashed ones and drains on SIGTERM. Singletons are shared by a process's requests.
+- **Non-blocking PostgreSQL** (`pgsql-async:` DSN) on ext-pgsql's asynchronous API, with prepared statements
+  per connection, PDO-compatible errors, and a connection pool (`database.pool_size`) leased per request.
+  `Database` now runs on a `Connection` interface (PDO or async).
+- **WebSockets** (RFC 6455) accepted from ordinary endpoints (`WebSocket::accept()`), handlers run in a fresh
+  scope per event with the caller's principal and tenant; browser token auth through the subprotocol.
+- **Server-sent events** (`EventStream`, `EventSink`), also under FrankenPHP and FPM.
+- **Hub**: pub/sub for real-time clients, across processes and nodes with `realtime.redis`.
+- A non-blocking Redis client (`AsyncRedis`) and socket watchers on the event loop (`Io`).
+- **OpenID Connect**: discovery, JWKS with caching and rotation on unknown key ids (with a cool-down),
+  ES256/ES384 and RS* keys, and the authorization code flow with PKCE (`OidcClient`).
+- **DPoP** (RFC 9449): proof verification (signature, htm/htu, iat, ath, jti replay protection) and tokens
+  bound to the client's key (`cnf.jkt` for JWTs, `dpopKey:` for Keel tokens).
+- **Broker transports** for the queue: Redis Streams, Amazon SQS (JSON API, SigV4 signed without the SDK)
+  and RabbitMQ (php-amqplib), fed by the transactional outbox (`queue.transport`).
+- **PHPStan extension** (`extension.neon`) checking ORM queries: column and relation names, value types,
+  operators, `update()` keys.
+- The `keel` command works when installed globally and runs the project's own version inside a project.
+
+### Changed
+
+- `Database` leases connections from the `ConnectionManager` instead of using a shared PDO directly.
+  `ConnectionManager::prepare()` is gone; use `acquire()`/`release()` or `with()`.
+- `Application::boot()` accepts `defaults` (applied under config.php).
+
+### Fixed
+
+- The supervisor's signal handlers no longer restart interrupted system calls, so SIGTERM stops it.
+
 ## 0.2.0 (unreleased)
 
 Toward phase 2, "Work", plus security and SaaS features.

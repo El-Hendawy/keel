@@ -31,7 +31,9 @@ final class Cli
           openapi           Print the OpenAPI document
           check             Run the production boot checks without serving traffic
           migrate           Apply pending SQL migrations (framework features first, then ./migrations)
-          serve             Start the development server (PHP built-in server)
+          serve             Start the development server (PHP built-in server; rebuilds on change)
+          run               Run the Keel server: event loop, many requests per process,
+                            WebSockets and server-sent events [--host=127.0.0.1 --port=8080 --workers=N]
           sdk               Generate a TypeScript client from the OpenAPI document (--out=sdk/client.ts)
 
           queue:work        Process background jobs (--queue=default,webhooks --once --max-jobs=N)
@@ -76,6 +78,7 @@ final class Cli
                 'check' => self::check($appFile, $env),
                 'migrate' => self::migrate($appFile, $env, self::absolute($options['dir'] ?? 'migrations')),
                 'serve' => self::serve($appFile, $options),
+                'run' => self::runServer($appFile, $env, $options),
                 'sdk' => self::sdk($appFile, $env, $options),
                 'queue:work' => self::queueWork($appFile, $env, $options),
                 'queue:failed' => self::queueFailed($appFile, $env),
@@ -218,6 +221,20 @@ final class Cli
     }
 
     /** @param array<string, string> $options */
+    private static function runServer(string $appFile, string $env, array $options): int
+    {
+        // Many requests share a process here: give each its own database connection by default.
+        $app = Application::boot($appFile, ['env' => $env, 'defaults' => ['database' => ['pool_size' => 8]]]);
+        $workers = (int) ($options['workers'] ?? 0);
+        if ($workers <= 0) {
+            $cpus = (int) trim((string) @shell_exec(\PHP_OS_FAMILY === 'Darwin' ? 'sysctl -n hw.ncpu' : 'nproc'));
+            $workers = max(1, $cpus);
+        }
+
+        return (new \Keel\Server\Supervisor($app, $options['host'] ?? '127.0.0.1', (int) ($options['port'] ?? 8080), $workers))->run();
+    }
+
+    /** @param array<string, string> $options */
     private static function sdk(string $appFile, string $env, array $options): int
     {
         $app = Application::boot($appFile, ['env' => $env]);
@@ -239,6 +256,19 @@ final class Cli
     {
         $app = Application::boot($appFile, ['env' => $env]);
         $queues = array_values(array_filter(explode(',', $options['queue'] ?? implode(',', self::queues($app)))));
+        $transport = \Keel\Queue\Transport\Transports::fromContainer($app->container());
+        if ($transport !== null) {
+            $broker = new \Keel\Queue\BrokerWorker($app->container(), $transport);
+            if (isset($options['once'])) {
+                return self::out(\sprintf('Processed %d job(s).', $broker->work($queues, 0, 0.5, 0.5)));
+            }
+            \Keel\Runtime\WorkerPolicy::fromEnvironment()->listenForSignals($broker->stop(...));
+            self::out('Processing ' . implode(', ', $queues) . ' from ' . $transport::class . ' (Ctrl+C or SIGTERM to stop after the current job).');
+            $processed = $broker->work($queues, (int) ($options['max-jobs'] ?? 0));
+            $app->shutdown();
+
+            return self::out("Stopped after $processed job(s).");
+        }
         $worker = new \Keel\Queue\QueueWorker($app->container(), (int) ($options['visibility'] ?? 300));
         if (isset($options['once'])) {
             return self::out(\sprintf('Processed %d job(s).', $worker->drain($queues)));
@@ -418,7 +448,7 @@ final class Cli
         $name = $options['name'] ?? basename($target);
         (new ProjectGenerator())->generate($target, $name);
 
-        return self::out("Created $name in $target.\n\n  cd $directory\n  composer install\n  vendor/bin/keel serve\n\nThen open http://127.0.0.1:8000/hello/world");
+        return self::out("Created $name in $target.\n\n  cd $directory\n  composer install\n  keel serve      # or vendor/bin/keel serve\n\nThen open http://127.0.0.1:8000/hello/world");
     }
 
     private static function definition(string $appFile): AppDefinition

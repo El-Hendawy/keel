@@ -1,7 +1,24 @@
 # Tooling
 
+Install the command once, globally:
+
+```bash
+composer global require el-hendawy/keel
+export PATH="$(composer global config bin-dir --absolute):$PATH"   # add to your shell profile
+```
+
+Inside a project, `keel` runs that project's own version (`vendor/bin/keel`), so each project uses the Keel
+it locked. `vendor/bin/keel` works too.
+
 Every command runs from the application root (where `app.php` is). `--env=<name>` selects the environment
 (default `KEEL_ENV` or `dev`); `--app=<file>` another application file.
+
+## Running
+
+| Command | What it does |
+| --- | --- |
+| `keel serve` | Development server (PHP's built-in server); rebuilds on every change |
+| `keel run [--host=127.0.0.1] [--port=8080] [--workers=N]` | The Keel server: many requests per process, WebSockets and SSE ([guide](server.md)) |
 
 ## Building and inspecting
 

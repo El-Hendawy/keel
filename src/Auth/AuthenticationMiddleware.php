@@ -43,6 +43,11 @@ final readonly class AuthenticationMiddleware implements MiddlewareInterface
                 return $handler->handle($request);
             }
         }
+        // Browsers cannot set Authorization on a WebSocket handshake; they send the token as a subprotocol.
+        $wsToken = $request->hasHeader('Authorization') ? null : \Keel\Realtime\WebSocket::tokenFromProtocols($request->getHeaderLine('Sec-WebSocket-Protocol'));
+        if ($wsToken !== null) {
+            $request = $request->withHeader('Authorization', 'Bearer ' . $wsToken);
+        }
         if (!$request->hasHeader('Authorization')) {
             return $handler->handle($request);
         }
@@ -52,6 +57,7 @@ final readonly class AuthenticationMiddleware implements MiddlewareInterface
             if ($principal->tenantId !== null) {
                 $this->tenant->set($principal->tenantId);
             }
+            $request = $request->withAttribute(Principal::class, $principal);
         }
 
         return $handler->handle($request);

@@ -82,8 +82,13 @@ final class TestApp
             return 0; // without ->withQueue() jobs already ran when pushed
         }
         $queues = array_values(array_unique(array_map(static fn (array $job): string => $job['queue'], $this->application->manifest->jobs())));
+        $queues = $queues === [] ? ['default'] : $queues;
+        $transport = \Keel\Queue\Transport\Transports::fromContainer($this->container());
+        if ($transport !== null) {
+            return (new \Keel\Queue\BrokerWorker($this->container(), $transport))->work($queues, $limit, 0.0, 0.0);
+        }
 
-        return (new \Keel\Queue\QueueWorker($this->container()))->drain($queues === [] ? ['default'] : $queues, $limit);
+        return (new \Keel\Queue\QueueWorker($this->container()))->drain($queues, $limit);
     }
 
     /**

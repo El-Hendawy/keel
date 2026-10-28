@@ -40,7 +40,8 @@ final class Application
 
     /**
      * @param string $appFile path to app.php, which returns an AppDefinition
-     * @param array{env?: string, debug?: bool, config?: array<string, mixed>, testing?: bool, checks?: bool} $options
+     * @param array{env?: string, debug?: bool, config?: array<string, mixed>, defaults?: array<string, mixed>, testing?: bool, checks?: bool} $options
+     *        `defaults` apply under config.php (the runtime's own defaults); `config` overrides it
      */
     public static function boot(string $appFile, array $options = []): self
     {
@@ -66,6 +67,7 @@ final class Application
         $config = array_replace_recursive(
             $manifest->data['config'],
             $environment->isTest() ? ['log' => ['level' => 'warning']] : [],
+            $options['defaults'] ?? [],
             self::loadConfig($definition, $environment),
             $options['config'] ?? [],
         );

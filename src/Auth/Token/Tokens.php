@@ -19,7 +19,9 @@ use Psr\Http\Message\ServerRequestInterface;
  *
  * A token issued while handling a request (a login endpoint) is bound to that client's
  * fingerprint. A token issued without one (`keel token:issue`, an admin screen) is bound
- * to the first client that uses it. Binding is on by default; see ClientFingerprint.
+ * to the first client that uses it. Binding is on by default; see ClientFingerprint. With
+ * $dpopKey (a JWK thumbprint from DpopVerifier) the token also requires DPoP proofs signed
+ * with that key, which is cryptographic proof of possession.
  * The `keel_` prefix lets secret scanners recognise leaked tokens.
  */
 #[Singleton]
@@ -51,11 +53,15 @@ final readonly class Tokens
         ?int $ttlSeconds = null,
         ?ServerRequestInterface $client = null,
         string $name = '',
+        ?string $dpopKey = null,
     ): IssuedToken {
         $secret = self::PREFIX . rtrim(strtr(base64_encode($this->random->bytes(32)), '+/', '-_'), '=');
         $now = $this->clock->now()->getTimestamp();
         $ttl = $ttlSeconds ?? $this->defaultTtl;
         $fingerprint = $this->binding && $client !== null ? $this->fingerprints->of($client) : new Fingerprint([]);
+        if ($dpopKey !== null) {
+            $fingerprint = $fingerprint->with('dpop', $dpopKey);
+        }
         $token = new StoredToken(
             $this->ids->generate(),
             self::hash($secret),

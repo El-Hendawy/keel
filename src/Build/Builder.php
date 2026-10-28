@@ -182,6 +182,7 @@ final class Builder
         $candidates = array_unique([
             ...($fixMessages === [] ? [] : [\Keel\Fix\FixGateway::class]),
             ...($entities === [] ? [] : [\Keel\Orm\Orm::class, \Keel\Orm\EntityMap::class]),
+            \Keel\Realtime\Hub::class,
             ...self::DEFAULT_SERVICES,
             ...$middleware,
             ...array_values($bindings),
@@ -226,7 +227,8 @@ final class Builder
             if ($schedule !== null) {
                 $scheduled[$class] = $schedule->newInstance()->cron;
             }
-            $isListener = $isListener || $isHandler || $isFixHandler || $schedule !== null;
+            $isSocketHandler = $reflection->implementsInterface(\Keel\Realtime\WebSocketHandler::class) && $reflection->isInstantiable();
+            $isListener = $isListener || $isHandler || $isFixHandler || $isSocketHandler || $schedule !== null;
             if ($isEndpoint) {
                 $routeCandidates[] = $class;
             }

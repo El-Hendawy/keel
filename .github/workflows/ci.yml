@@ -17,7 +17,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: curl, mbstring, pdo_sqlite, pcntl, redis
+          extensions: curl, mbstring, pdo_sqlite, pcntl, posix, redis, pgsql
           coverage: none
       - run: composer install --no-interaction --no-progress
       - name: Static analysis (framework and example)
@@ -41,7 +41,8 @@ jobs:
           path: benchmark.txt
 
   databases:
-    # The database-backed tests (shop, auth, queue, tenancy) on real PostgreSQL and MySQL.
+    # The database-backed tests on real PostgreSQL (PDO and the non-blocking driver) and MySQL,
+    # and the server and queue tests with Redis.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -49,6 +50,8 @@ jobs:
         include:
           - db: postgres
             dsn: 'pgsql:host=127.0.0.1;port=5432;dbname=keel_test;user=keel;password=keel'
+          - db: postgres-async
+            dsn: 'pgsql-async:host=127.0.0.1;port=5432;dbname=keel_test;user=keel;password=keel'
           - db: mysql
             dsn: 'mysql:host=127.0.0.1;port=3306;dbname=keel_test;user=root;password=keel'
     services:
@@ -67,15 +70,58 @@ jobs:
           MYSQL_DATABASE: keel_test
         ports: ['3306:3306']
         options: --health-cmd "mysqladmin ping -pkeel" --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: curl, mbstring, pdo_sqlite, pdo_pgsql, pdo_mysql, pcntl
+          extensions: curl, mbstring, pdo_sqlite, pdo_pgsql, pdo_mysql, pgsql, pcntl, posix, redis
           coverage: none
       - run: composer install --no-interaction --no-progress
       - name: Tests on ${{ matrix.db }}
         env:
           KEEL_TEST_DATABASE_DSN: ${{ matrix.dsn }}
-        run: vendor/bin/phpunit tests/Http tests/Auth tests/Queue tests/Orm
+          KEEL_TEST_PGSQL_DSN: 'pgsql:host=127.0.0.1;port=5432;dbname=keel_test;user=keel;password=keel'
+          KEEL_TEST_REDIS_URL: redis://127.0.0.1:6379
+        run: vendor/bin/phpunit tests/Http tests/Auth tests/Queue tests/Orm tests/Database tests/Server
+
+  brokers:
+    # The queue transports against real RabbitMQ and an SQS-compatible server.
+    runs-on: ubuntu-latest
+    services:
+      rabbitmq:
+        image: rabbitmq:3.13
+        ports: ['5672:5672']
+        options: --health-cmd "rabbitmq-diagnostics -q ping" --health-interval 5s --health-timeout 5s --health-retries 20
+      elasticmq:
+        image: softwaremill/elasticmq-native:1.6.9
+        ports: ['9324:9324']
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: curl, mbstring, pdo_sqlite, pcntl, redis, sockets
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - name: Transport tests
+        env:
+          KEEL_TEST_AMQP_URL: amqp://guest:guest@127.0.0.1:5672/
+          KEEL_TEST_SQS_ENDPOINT: http://127.0.0.1:9324/
+          KEEL_TEST_REDIS_URL: redis://127.0.0.1:6379
+        run: vendor/bin/phpunit tests/Queue/TransportTest.php
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-docs.txt && mkdocs build --strict

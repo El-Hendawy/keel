@@ -7,10 +7,12 @@ namespace Keel\Auth\Token;
 use Keel\Auth\Fingerprint\Fingerprint;
 use Keel\Container\Attribute\Singleton;
 use Keel\Database\ConnectionManager;
+use Keel\Database\Driver\Connection;
 
 /**
  * Tokens in the `keel_tokens` table (created by `keel migrate` when ->withAuth() is on).
- * Uses the primary connection directly, so a revocation is visible to the next request.
+ * Reads and writes the primary, so a revocation is visible to the next request; with the
+ * async PostgreSQL driver the lookup does not block the process.
  */
 #[Singleton]
 final readonly class DatabaseTokenStore implements TokenStore
@@ -21,10 +23,10 @@ final readonly class DatabaseTokenStore implements TokenStore
 
     public function save(StoredToken $token): void
     {
-        $this->connections->writer()->prepare(
+        $this->run(
             'INSERT INTO keel_tokens (id, hash, principal_id, tenant_id, scopes, kind, fingerprint, bind_on_first_use, name, created_at, expires_at, revoked_at)'
             . ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        )->execute([
+            [
             $token->id,
             $token->hash,
             $token->principalId,
@@ -42,12 +44,8 @@ final readonly class DatabaseTokenStore implements TokenStore
 
     public function findByHash(string $hash): ?StoredToken
     {
-        $pdo = $this->connections->writer();
-        $statement = $this->connections->prepare($pdo, 'SELECT * FROM keel_tokens WHERE hash = ?');
-        $statement->execute([$hash]);
-        $row = $statement->fetch(\PDO::FETCH_ASSOC);
-        $statement->closeCursor();
-        if (!\is_array($row)) {
+        $row = $this->connections->with(static fn (Connection $c) => $c->query('SELECT * FROM keel_tokens WHERE hash = ?', [$hash])->rows[0] ?? null);
+        if ($row === null) {
             return null;
         }
         $scopes = json_decode(self::string($row, 'scopes'), true, 4, \JSON_THROW_ON_ERROR);
@@ -70,23 +68,23 @@ final readonly class DatabaseTokenStore implements TokenStore
 
     public function bindOnFirstUse(string $id, Fingerprint $fingerprint): bool
     {
-        $statement = $this->connections->writer()->prepare('UPDATE keel_tokens SET fingerprint = ?, bind_on_first_use = 0 WHERE id = ? AND bind_on_first_use = 1');
-        $statement->execute([$fingerprint->encode(), $id]);
-
-        return $statement->rowCount() === 1;
+        return $this->run('UPDATE keel_tokens SET fingerprint = ?, bind_on_first_use = 0 WHERE id = ? AND bind_on_first_use = 1', [$fingerprint->encode(), $id]) === 1;
     }
 
     public function revoke(string $id, int $at): void
     {
-        $this->connections->writer()->prepare('UPDATE keel_tokens SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL')->execute([$at, $id]);
+        $this->run('UPDATE keel_tokens SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL', [$at, $id]);
     }
 
     public function revokeAllFor(string $principalId, int $at): int
     {
-        $statement = $this->connections->writer()->prepare('UPDATE keel_tokens SET revoked_at = ? WHERE principal_id = ? AND revoked_at IS NULL');
-        $statement->execute([$at, $principalId]);
+        return $this->run('UPDATE keel_tokens SET revoked_at = ? WHERE principal_id = ? AND revoked_at IS NULL', [$at, $principalId]);
+    }
 
-        return $statement->rowCount();
+    /** @param list<scalar|null> $params */
+    private function run(string $sql, array $params): int
+    {
+        return $this->connections->with(static fn (Connection $c): int => $c->query($sql, $params)->affected);
     }
 
     /** @param array<mixed> $row */

@@ -45,6 +45,13 @@ Nested calls use savepoints. A transaction left open when the request ends is ro
 With `replica_dsn` set, reads go to the replica until the scope writes; from then on they use the primary,
 so a request always reads its own writes.
 
+## Non-blocking PostgreSQL
+
+`pgsql-async:host=...;dbname=...` uses ext-pgsql's asynchronous API: under [`keel run`](server.md) a
+query suspends only its request, not the process. Each request leases its own connection from a pool
+(`database.pool_size`, 8 per process by default under `keel run`; `database.pool_timeout_ms`). The whole test
+suite runs against this driver as well as PDO.
+
 Each worker caches prepared statements per connection (`database.statement_cache`, default 256), so a
 repeated query skips the prepare round trip on PostgreSQL and MySQL.
 

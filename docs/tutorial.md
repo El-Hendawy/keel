@@ -8,14 +8,15 @@ You need PHP 8.3+, Composer, and the `pdo_sqlite` extension (bundled with most P
 
 ## 1. Create the project
 
-Keel is not on Packagist yet, so its command line comes from a checkout:
+Install the `keel` command once, then create the project:
 
 ```bash
-git clone https://github.com/El-Hendawy/keel.git
-cd keel && composer install
-bin/keel new ../notes
-cd ../notes && composer install
+composer global require el-hendawy/keel
+keel new notes
+cd notes && composer install
 ```
+
+(Composer's global bin directory must be on your `PATH`: `composer global config bin-dir --absolute`.)
 
 The new project requires `el-hendawy/keel` and contains:
 
@@ -31,7 +32,7 @@ The new project requires `el-hendawy/keel` and contains:
 Start the development server and try it:
 
 ```bash
-vendor/bin/keel serve
+keel serve
 curl localhost:8000/hello/world
 # {"message":"Hello, world!","at":"2026-10-28T19:54:16.123+00:00"}
 ```
@@ -140,8 +141,8 @@ final class Note
 Let Keel write the migration, then apply it (Keel's own tables for tokens come first):
 
 ```bash
-vendor/bin/keel orm:diff --write     # writes migrations/<timestamp>_orm_sync.sql: review it
-vendor/bin/keel migrate
+keel orm:diff --write     # writes migrations/<timestamp>_orm_sync.sql: review it
+keel migrate
 ```
 
 ## 4. Endpoints
@@ -296,7 +297,7 @@ attributes), no serialization code (generated from the output's public propertie
 Issue a token for a user of team `team-1`, then call the API:
 
 ```bash
-vendor/bin/keel token:issue --principal=ada --tenant=team-1 --scopes='notes:*'
+keel token:issue --principal=ada --tenant=team-1 --scopes='notes:*'
 TOKEN=keel_...   # the token it printed
 
 curl -X POST localhost:8000/notes -H "Authorization: Bearer $TOKEN" \
@@ -312,7 +313,7 @@ Things to try:
 - A token without `notes:write` gets 403 with the missing scope.
 - The token is bound to the first client that used it (here, curl). The same token sent with
   `-A "Mozilla/5.0"` is refused **and revoked**: a stolen token gets one try.
-- `vendor/bin/keel openapi` prints the OpenAPI document; `vendor/bin/keel sdk --out=web/api.ts` writes a typed
+- `keel openapi` prints the OpenAPI document; `keel sdk --out=web/api.ts` writes a typed
   TypeScript client.
 
 ## 6. Test it
@@ -378,10 +379,10 @@ so the same tests run on PostgreSQL or MySQL in CI.
 
 ```bash
 composer install --no-dev --classmap-authoritative
-KEEL_ENV=prod vendor/bin/keel build --env=prod
-KEEL_ENV=prod APP_KEY=... METRICS_TOKEN=... vendor/bin/keel check --env=prod
-KEEL_ENV=prod vendor/bin/keel migrate
-frankenphp run                 # the generated Caddyfile runs public/index.php in worker mode
+KEEL_ENV=prod keel build --env=prod
+KEEL_ENV=prod APP_KEY=... METRICS_TOKEN=... keel check --env=prod
+KEEL_ENV=prod keel migrate
+keel run --host=0.0.0.0 --port=8080   # or: frankenphp run (worker mode)
 ```
 
 `keel check` refuses to let a production worker start with debug on, without `app.key`, with stores that only
@@ -393,4 +394,6 @@ work on one node, or with a public `/metrics`. Each failure says what to change.
 - [The ORM](guide/orm.md): relations without N+1, `whereHas`, upserts, soft deletes, schema diffs.
 - [Authentication](guide/auth.md): login endpoints, JWTs from your identity provider, policies.
 - [Background work](guide/background-work.md): jobs, the outbox, async listeners, scheduled tasks, webhooks.
+- [The Keel server](guide/server.md): many requests per process, non-blocking PostgreSQL.
+- [Real time](guide/realtime.md): WebSockets and server-sent events.
 - [Production](guide/production.md): workers, Redis stores, load balancers, queue and scheduler processes.

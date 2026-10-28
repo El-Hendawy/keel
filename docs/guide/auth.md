@@ -112,6 +112,75 @@ Keel verifies JWTs from your identity provider:
 JWTs cannot be revoked before they expire; keep them short-lived and use opaque tokens for long sessions and
 API keys.
 
+## OpenID Connect providers
+
+Accept tokens from Auth0, Okta, Entra ID, Keycloak, Google or any OpenID Connect provider:
+
+```php
+'auth' => ['oidc' => [
+    'issuer' => 'https://login.example.com/',   // discovery: <issuer>/.well-known/openid-configuration
+    'audience' => 'api',
+]],
+'auth' => ['jwt' => ['tenant_claim' => 'org_id']],
+```
+
+- Signing keys come from the provider's JWKS (RSA and EC P-256/P-384: RS256/384/512, ES256/384) and are
+  cached for `auth.oidc.jwks_ttl_seconds` (1 hour) in the application cache (shared through Redis with
+  `->withRedisStores()`).
+- **Key rotation needs no deploy:** a token signed with a key id the cache does not know triggers one
+  refetch, at most every `auth.oidc.refresh_cooldown_seconds` (60), so forged key ids cannot flood the
+  provider.
+- `iss` must be the issuer and `aud` must include `auth.oidc.audience`; `exp`/`nbf` are checked with leeway.
+- Keel-issued JWTs and statically configured keys keep working alongside.
+
+### Signing users in
+
+For a backend that serves its own web app, `OidcClient` runs the authorization code flow with PKCE:
+
+```php
+'auth' => ['oidc' => ['issuer' => '...', 'client_id' => 'web', 'client_secret' => getenv('OIDC_SECRET'), 'redirect_uri' => 'https://app.example.com/callback']],
+```
+
+```php
+$login = $oidc->start();                                // redirect the user to $login->url; keep $login server-side
+$result = $oidc->finish($code, $state, $login);         // on the callback: verified ID token claims
+$token = $tokens->issue($result['claims']['sub'], $tenantId, $scopes, client: $request);
+```
+
+The ID token's signature, issuer, audience, expiry and nonce are verified; a state mismatch is refused.
+
+## DPoP: proof of possession
+
+Fingerprint binding raises the cost of using a stolen token; DPoP (RFC 9449) makes it useless. The client
+keeps a private key (in browsers, a non-extractable WebCrypto key), signs a short proof JWT for every request,
+and the token is bound to the key's thumbprint:
+
+```http
+GET /orders HTTP/1.1
+Authorization: DPoP keel_3wVZ...
+DPoP: eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7...
+```
+
+```php
+// A login endpoint: verify the client's proof, then bind the token to its key.
+$jkt = $dpop->verify($request);
+$issued = $tokens->issue($user->id, $user->tenantId, $scopes, client: $request, dpopKey: $jkt);
+// Or a JWT: $jwt->issue($principal, dpopKey: $jkt)  -> cnf.jkt
+```
+
+- A DPoP-bound token is refused as a plain `Bearer` token, refused with a proof from another key, and each
+  proof is checked: `typ`, an asymmetric algorithm (ES256/384, RS256/384/512), the signature, `htm`, `htu`,
+  `iat` within `auth.dpop.max_age_seconds` (60), `ath` (the token's hash), and a `jti` never seen before
+  (replays are refused through the LockStore, so across nodes with Redis).
+- An API key issued with `keel token:issue` binds to the DPoP key of the first client that uses it, like
+  fingerprints.
+- Behind a proxy that rewrites the host, set `auth.dpop.base_url` to the public origin so `htu` matches.
+- `DpopProof::create($key, $method, $url, $token)` creates proofs for PHP clients and tests.
+- JWTs from a provider that issues `cnf.jkt` (DPoP-bound access tokens) are checked the same way.
+
+DPoP and fingerprint binding work together: a DPoP-bound token is also fingerprint-bound unless you turned
+that off.
+
 ## Token binding
 
 A bearer token works for whoever holds it. Binding narrows that to the client it was issued to.

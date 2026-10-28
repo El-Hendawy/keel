@@ -34,6 +34,25 @@ final readonly class Fingerprint
         return $mismatched;
     }
 
+    /** The DPoP key thumbprint this token is bound to, if any (stored with the fingerprint). */
+    public function dpop(): ?string
+    {
+        return $this->components['dpop'] ?? null;
+    }
+
+    public function with(string $component, string $value): self
+    {
+        return new self([$component => $value] + $this->components);
+    }
+
+    public function without(string $component): self
+    {
+        $components = $this->components;
+        unset($components[$component]);
+
+        return new self($components);
+    }
+
     public function isEmpty(): bool
     {
         return $this->components === [];

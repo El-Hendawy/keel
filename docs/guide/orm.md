@@ -154,6 +154,24 @@ $orm->query(Post::class)->where('createdAt', '<', $cutoff)->delete();
   `TenantContext::acrossTenants()` are the named exceptions. ORM statements satisfy the tenant guard.
 - The identity map lives for the scope (one request or job). `$orm->clear()` empties it in long jobs.
 
+## Checked by PHPStan
+
+Keel ships a PHPStan extension (`extension.neon`; registered automatically with
+`phpstan/extension-installer`, or `includes: [vendor/el-hendawy/keel/extension.neon]`). It checks ORM queries
+during analysis, so mistakes fail in CI instead of at runtime:
+
+```php
+$orm->query(Post::class)->where('titel', 'x');          // Post has no column property "titel". Columns: ...
+$orm->query(Post::class)->where('status', 'published'); // Post::$status expects PostStatus, 'published' given
+$orm->query(Post::class)->where('rating', '=>', 3);     // Unsupported operator "=>"
+$orm->query(Post::class)->with('comments.writer');      // Comment has no relation "writer"
+$orm->query(Post::class)->update(['title' => 42]);      // Post::$title expects string, 42 given
+```
+
+It checks column names in `where*`, `orderBy`, `pluck` and aggregates, value types against the property's
+declared type, operators, relation paths in `with`/`whereHas`, and `update()` keys and values. Names built
+at runtime are still checked when the query runs.
+
 ## Databases
 
 | Driver | Dialect | Tested here |

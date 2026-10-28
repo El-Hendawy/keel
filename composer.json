@@ -26,6 +26,7 @@
         "psr/log": "^3.0"
     },
     "require-dev": {
+        "php-amqplib/php-amqplib": "^3.7",
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^11.0"
     },
@@ -34,6 +35,8 @@
         "ext-pcntl": "Graceful shutdown on SIGTERM in long-running workers",
         "ext-pdo": "Database layer",
         "ext-redis": "Shared stores for rate limiting and idempotency across nodes",
+        "ext-pgsql": "The non-blocking PostgreSQL driver (pgsql-async: DSNs) for keel run",
+        "php-amqplib/php-amqplib": "The RabbitMQ queue transport",
         "spiral/roadrunner-http": "Run under RoadRunner"
     },
     "autoload": {
@@ -55,7 +58,8 @@
     },
     "config": { "sort-packages": true },
     "extra": {
-        "branch-alias": { "dev-main": "0.2.x-dev" }
+        "branch-alias": { "dev-main": "0.3.x-dev" },
+        "phpstan": { "includes": ["extension.neon"] }
     },
     "minimum-stability": "stable"
 }

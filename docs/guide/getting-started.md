@@ -6,17 +6,18 @@ Requirements: PHP 8.3+ with `ext-json` and `ext-mbstring`, plus `ext-pdo` and th
 `ext-curl` for the HTTP client, `ext-pcntl` for graceful shutdown and `ext-redis` for shared stores.
 
 ```bash
-git clone https://github.com/El-Hendawy/keel.git
-cd keel && composer install
-bin/keel new ../acme          # scaffold a project
-cd ../acme && composer install
-vendor/bin/keel serve         # development server on http://127.0.0.1:8000
+composer global require el-hendawy/keel     # once: installs the `keel` command
+keel new acme                               # scaffold a project
+cd acme && composer install
+keel serve                                  # development server on http://127.0.0.1:8000
 ```
 
-Keel's Composer package is `el-hendawy/keel` (namespace `Keel\`); until the first tagged release, it is
-installed from `main` (`^0.2@dev`), and the generated `composer.json` also lists the GitHub repository so it
-installs even before Packagist has it. To add Keel to an existing project:
-`composer require el-hendawy/keel:^0.2@dev`. The [tutorial](../tutorial.md) builds a complete API from
+Make sure Composer's global bin directory is on your `PATH` (`composer global config bin-dir --absolute`).
+Inside a project, `keel` runs the project's own version.
+
+Keel's Composer package is `el-hendawy/keel` (namespace `Keel\`). Until the first tagged release it is
+installed from `main` (`^0.3@dev`). To add Keel to an existing project:
+`composer require el-hendawy/keel:^0.3@dev`. The [tutorial](../tutorial.md) builds a complete API from
 here.
 
 The skeleton contains:

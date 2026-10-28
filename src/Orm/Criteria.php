@@ -10,8 +10,10 @@ use Keel\Tenancy\TenantContext;
 /**
  * Conditions on one entity, by property name. Names are checked against the compiled
  * metadata, operators against a fixed list, and values are always bound: no input can
- * reach the SQL text.
+ * reach the SQL text. The PHPStan extension (extension.neon) checks names and value types
+ * during analysis.
  *
+ * @template T of object
  * @phpstan-import-type Meta from EntityMap
  */
 class Criteria
@@ -84,14 +86,14 @@ class Criteria
      * Rows that have at least one related row (matching $conditions): EXISTS, not a join,
      * so the result never repeats rows.
      *
-     * @param (\Closure(Criteria): mixed)|null $conditions
+     * @param (\Closure(Criteria<object>): mixed)|null $conditions
      */
     public function whereHas(string $relation, ?\Closure $conditions = null): static
     {
         return $this->exists($relation, $conditions, false);
     }
 
-    /** @param (\Closure(Criteria): mixed)|null $conditions */
+    /** @param (\Closure(Criteria<object>): mixed)|null $conditions */
     public function whereDoesntHave(string $relation, ?\Closure $conditions = null): static
     {
         return $this->exists($relation, $conditions, true);
@@ -180,7 +182,7 @@ class Criteria
         return $this;
     }
 
-    /** @param (\Closure(Criteria): mixed)|null $conditions */
+    /** @param (\Closure(Criteria<object>): mixed)|null $conditions */
     private function exists(string $relation, ?\Closure $conditions, bool $not): static
     {
         $definition = $this->meta['relations'][$relation] ?? throw new \InvalidArgumentException("{$this->meta['class']} has no relation \"$relation\".");

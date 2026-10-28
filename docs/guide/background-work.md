@@ -38,6 +38,33 @@ $queue->push(new SendReceipt($order->id, $email), delaySeconds: 600);
 - Delivery is **at least once**: write handlers so running twice is harmless.
 - A job type has exactly one handler; two is a build error.
 
+## Brokers: Redis Streams, Amazon SQS, RabbitMQ
+
+By default workers poll `keel_jobs`. For higher volume or an existing broker, set a transport:
+
+```php
+'queue' => [
+    'transport' => 'redis',     // database (default) | redis | sqs | amqp
+    'visibility_seconds' => 300,
+    'sqs' => ['region' => 'eu-west-1', 'queues' => ['default' => 'https://sqs.eu-west-1.amazonaws.com/123/app', 'webhooks' => '...']],
+    'amqp' => ['url' => 'amqp://app:secret@rabbitmq:5672/app'],
+],
+```
+
+The outbox stays: `push()` still writes to `keel_jobs` inside your transaction. `keel queue:work` relays
+committed jobs to the broker (deleting them only after they were published) and consumes from it.
+Delivery is at least once on every transport.
+
+| Transport | Delays and retries | Crashed worker | Dead letters | Needs |
+| --- | --- | --- | --- | --- |
+| `redis` | Sorted set, moved into the stream when due | `XAUTOCLAIM` after `visibility_seconds` | Stream `keel:q:<queue>:failed` | `ext-redis` |
+| `sqs` | `DelaySeconds` (max 15 min) and visibility timeout (max 12 h) | Visibility timeout | Queue `<queue>-failed` | Nothing: Keel signs SigV4 itself |
+| `amqp` | `keel.<queue>.retry` with per-message TTL dead-lettering back | Unacknowledged messages return | Queue `keel.<queue>.failed` | `php-amqplib/php-amqplib` |
+
+SQS credentials: `queue.sqs.key`/`secret`/`token` or `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and
+`AWS_SESSION_TOKEN`; `queue.sqs.endpoint` points at LocalStack or ElasticMQ in development. Keel's SigV4
+signer is tested against AWS's published test suite.
+
 ## The transactional outbox
 
 With `->withQueue()`, `push()` inserts into `keel_jobs` through the request's `Database`. Inside a

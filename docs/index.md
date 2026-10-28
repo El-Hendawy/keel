@@ -60,12 +60,12 @@ validation code:
 
 <div class="grid cards" markdown>
 
--   :material-lightning-bolt: **Compiled, long-running**
+-   :material-lightning-bolt: **Compiled, concurrent**
 
     ---
 
-    Container, routes, hydrators and serializers are generated PHP. Workers boot once; lifetimes
-    (`Singleton`, `Scoped`, `Transient`) are checked at build time so request state never leaks.
+    Container, routes, hydrators and serializers are generated PHP. `keel run` serves many requests per
+    process on an event loop with non-blocking PostgreSQL, Redis and HTTP; FrankenPHP and RoadRunner work too.
 
 -   :material-shield-lock: **Secure by default**
 
@@ -109,6 +109,13 @@ validation code:
     Traces with W3C propagation and OTLP export, Prometheus RED metrics per route, JSON logs with trace
     ids, liveness and readiness endpoints.
 
+-   :material-access-point: **Real time**
+
+    ---
+
+    WebSockets and server-sent events on the same endpoints and auth as the rest of the API, with a
+    pub/sub hub across processes and nodes.
+
 -   :material-swap-horizontal: **FIX protocol**
 
     ---
@@ -121,17 +128,20 @@ validation code:
 ## Five minutes to a running API
 
 ```bash
-git clone https://github.com/El-Hendawy/keel.git
-cd keel && composer install
-bin/keel new ../acme
-cd ../acme && composer install
-vendor/bin/keel serve        # http://127.0.0.1:8000/hello/world
+composer global require el-hendawy/keel   # the `keel` command
+keel new acme && cd acme && composer install
+keel serve                                # http://127.0.0.1:8000/hello/world
+keel run                                  # the Keel server: many requests per process, WebSockets, SSE
 ```
 
 Then follow the [tutorial](tutorial.md): a multi-tenant notes API with a database, authentication,
 validation, pagination, tests and a production build, in about 150 lines.
 
 ## Performance
+
+With a 10 ms database query per request, `keel run` with the non-blocking PostgreSQL driver served
+**17,027 req/s** in 244 MB, where FrankenPHP with 64 workers served 5,734 req/s; without I/O, 100,478 vs
+51,985 req/s. Method and caveats: [the Keel server](guide/server.md#benchmark).
 
 In-process, one worker, PHP 8.3 on Apple silicon (`benchmarks/kernel.php`), every request but the health
 check authenticated with a bound token:
@@ -149,6 +159,6 @@ served 2× to 6.3× more requests per second on PostgreSQL. See the
 
 ## Status
 
-Keel is a **developer preview (0.2)**. Everything documented here is implemented and tested; until 1.0, minor
+Keel is a **developer preview (0.3)**. Everything documented here is implemented and tested; until 1.0, minor
 versions may break compatibility, with upgrade notes in the
 [changelog](https://github.com/El-Hendawy/keel/blob/main/CHANGELOG.md). PHP 8.3 or later.

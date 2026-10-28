@@ -35,7 +35,7 @@ final class ProjectGenerator
             'type' => 'project',
             // The repository is listed so projects install before the first tagged release reaches Packagist.
             'repositories' => [['type' => 'vcs', 'url' => 'https://github.com/El-Hendawy/keel']],
-            'require' => ['php' => '>=8.3', 'el-hendawy/keel' => '^0.2@dev'],
+            'require' => ['php' => '>=8.3', 'el-hendawy/keel' => '^0.3@dev'],
             'require-dev' => ['phpstan/phpstan' => '^2.0', 'phpunit/phpunit' => '^11.0'],
             'autoload' => ['psr-4' => ["$namespace\\" => 'src/']],
             'autoload-dev' => ['psr-4' => ["$namespace\\Tests\\" => 'tests/']],

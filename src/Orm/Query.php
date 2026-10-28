@@ -24,6 +24,7 @@ use Keel\Tenancy\TenantContext;
  *         ->get();
  *
  * @template T of object
+ * @extends Criteria<T>
  * @phpstan-import-type Meta from EntityMap
  */
 final class Query extends Criteria

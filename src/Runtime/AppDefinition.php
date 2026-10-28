@@ -256,6 +256,9 @@ final class AppDefinition
             \Keel\Auth\Token\Tokens::class,
             \Keel\Auth\Jwt\JwtTokens::class,
             \Keel\Auth\Fingerprint\ClientFingerprint::class,
+            \Keel\Auth\Dpop\DpopVerifier::class,
+            \Keel\Auth\Oidc\OidcProvider::class,
+            \Keel\Auth\Oidc\OidcClient::class,
         );
     }
 

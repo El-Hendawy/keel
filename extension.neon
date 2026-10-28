@@ -1,0 +1,4 @@
+# Keel's PHPStan extension: checks ORM queries (property and relation names, value types,
+# operators) during analysis. Included automatically with phpstan/extension-installer.
+rules:
+    - Keel\PHPStan\OrmQueryRule

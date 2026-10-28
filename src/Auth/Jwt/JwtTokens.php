@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Keel\Auth\Jwt;
 
 use Keel\Auth\Fingerprint\Fingerprint;
+use Keel\Auth\Oidc\OidcProvider;
 use Keel\Auth\Principal;
 use Keel\Container\Attribute\Config;
 use Keel\Container\Attribute\Singleton;
@@ -24,7 +25,8 @@ use Psr\Clock\ClockInterface;
  *
  * `exp` is required; `nbf`, `iss` and `aud` are checked when configured. The tenant comes
  * from `auth.jwt.tenant_claim` and scopes from `scope` (space separated) or `scp`.
- * A token carrying `cnf.kfp` is bound: it is only accepted from the client it was issued to.
+ * A token carrying `cnf.kfp` is bound to a client fingerprint; one carrying `cnf.jkt` needs a
+ * DPoP proof from that key. With `auth.oidc.issuer`, keys come from the provider's JWKS.
  */
 #[Singleton]
 final readonly class JwtTokens
@@ -34,21 +36,36 @@ final readonly class JwtTokens
         private ClockInterface $clock,
         private Keys $secrets,
         private Random $random,
+        private OidcProvider $oidc,
         #[Config('auth.jwt.keys')] private array $keys = [],
         #[Config('auth.jwt.issuer')] private string $issuer = '',
         #[Config('auth.jwt.audience')] private string $audience = '',
         #[Config('auth.jwt.leeway_seconds')] private int $leeway = 30,
         #[Config('auth.jwt.tenant_claim')] private string $tenantClaim = 'tenant_id',
         #[Config('auth.jwt.ttl_seconds')] private int $ttl = 900,
+        #[Config('auth.oidc.audience')] private string $oidcAudience = '',
     ) {
     }
 
     /**
-     * @return array{principal: Principal, binding: ?string} the principal and the bound fingerprint digest, if any
+     * @return array{principal: Principal, binding: ?string, jkt: ?string} the principal, and its fingerprint or DPoP binding
      */
     public function verify(string $token): array
     {
-        $claims = Jwt::verify($token, $this->keyring());
+        [$header] = Jwt::parse($token);
+        $kid = \is_string($header['kid'] ?? null) ? $header['kid'] : null;
+        $ring = $this->keyring();
+        $fromProvider = false;
+        if (($kid === null || !isset($ring[$kid])) && $this->oidc->enabled()) {
+            $key = $this->oidc->key($kid) ?? throw new Unauthorized('The token was signed with an unknown key.', headers: ['WWW-Authenticate' => 'Bearer error="invalid_token"']);
+            $ring = [$kid ?? 'oidc' => $key];
+            $fromProvider = true;
+        }
+        $claims = Jwt::verify($token, $ring);
+        if ($fromProvider && ($claims['iss'] ?? null) !== $this->oidc->issuer()) {
+            throw new Unauthorized('The token was issued by an unexpected issuer.');
+        }
+        $audience = $fromProvider && $this->oidcAudience !== '' ? $this->oidcAudience : $this->audience;
         $now = $this->clock->now()->getTimestamp();
         $exp = $claims['exp'] ?? null;
         if (!\is_int($exp) || $exp + $this->leeway < $now) {
@@ -58,12 +75,12 @@ final readonly class JwtTokens
         if (\is_int($nbf) && $nbf - $this->leeway > $now) {
             throw new Unauthorized('The token is not valid yet.', headers: ['WWW-Authenticate' => 'Bearer error="invalid_token"']);
         }
-        if ($this->issuer !== '' && ($claims['iss'] ?? null) !== $this->issuer) {
+        if (!$fromProvider && $this->issuer !== '' && ($claims['iss'] ?? null) !== $this->issuer) {
             throw new Unauthorized('The token was issued by an unexpected issuer.');
         }
-        if ($this->audience !== '') {
+        if ($audience !== '') {
             $aud = $claims['aud'] ?? null;
-            if (!($aud === $this->audience || (\is_array($aud) && \in_array($this->audience, $aud, true)))) {
+            if (!($aud === $audience || (\is_array($aud) && \in_array($audience, $aud, true)))) {
                 throw new Unauthorized('The token is not meant for this API.');
             }
         }
@@ -79,11 +96,13 @@ final readonly class JwtTokens
         };
         $cnf = $claims['cnf'] ?? null;
         $binding = \is_array($cnf) && \is_string($cnf['kfp'] ?? null) ? $cnf['kfp'] : null;
+        $jkt = \is_array($cnf) && \is_string($cnf['jkt'] ?? null) ? $cnf['jkt'] : null;
         $jti = $claims['jti'] ?? null;
 
         return [
             'principal' => new Principal($sub, \is_string($tenant) ? $tenant : null, $scopes, Principal::USER, \is_string($jti) ? $jti : null, $claims),
             'binding' => $binding,
+            'jkt' => $jkt,
         ];
     }
 
@@ -91,7 +110,7 @@ final readonly class JwtTokens
      * Issues a short-lived JWT signed with `auth.jwt.signing_key` (a kid in auth.jwt.keys),
      * or with a key derived from app.key when none is configured.
      */
-    public function issue(Principal $principal, ?Fingerprint $boundTo = null, ?int $ttlSeconds = null): string
+    public function issue(Principal $principal, ?Fingerprint $boundTo = null, ?int $ttlSeconds = null, ?string $dpopKey = null): string
     {
         $now = $this->clock->now()->getTimestamp();
         $claims = [
@@ -110,8 +129,15 @@ final readonly class JwtTokens
         if ($this->audience !== '') {
             $claims['aud'] = $this->audience;
         }
-        if ($boundTo !== null && !$boundTo->isEmpty()) {
-            $claims['cnf'] = ['kfp' => $boundTo->digest()];
+        $cnf = [];
+        if ($boundTo !== null && !$boundTo->without('dpop')->isEmpty()) {
+            $cnf['kfp'] = $boundTo->without('dpop')->digest();
+        }
+        if ($dpopKey !== null) {
+            $cnf['jkt'] = $dpopKey;
+        }
+        if ($cnf !== []) {
+            $claims['cnf'] = $cnf;
         }
         [$kid, $key] = $this->signingKey();
 

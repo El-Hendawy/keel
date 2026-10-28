@@ -87,6 +87,8 @@ nav:
       - Database: guide/database.md
       - ORM: guide/orm.md
       - Background work: guide/background-work.md
+      - The Keel server: guide/server.md
+      - Real time (WebSockets, SSE): guide/realtime.md
       - Cache and pagination: guide/cache-and-pagination.md
       - Concurrency: guide/concurrency.md
       - TOON: guide/toon.md

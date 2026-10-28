@@ -201,6 +201,32 @@ final class ShopTest extends TestCase
         });
     }
 
+    public function testWebSocketHandshakesAreAuthenticatedLikeAnyRequest(): void
+    {
+        $handshake = ['Upgrade' => 'websocket', 'Connection' => 'Upgrade', 'Sec-WebSocket-Version' => '13', 'Sec-WebSocket-Key' => base64_encode(random_bytes(16))];
+        $this->app->get('/ws/orders', $handshake)->assertStatus(401);
+
+        // Browsers cannot send Authorization on a WebSocket: the token travels as a subprotocol.
+        $token = substr($this->user['Authorization'], \strlen('Bearer '));
+        $response = $this->app->get('/ws/orders', $handshake + ['Sec-WebSocket-Protocol' => "keel, keel.token.$token"])->assertStatus(101);
+        $upgrade = $response->response->getBody();
+        self::assertInstanceOf(\Keel\Realtime\UpgradeBody::class, $upgrade);
+        self::assertSame(self::TENANT_ID, $upgrade->principal?->tenantId);
+        self::assertSame('keel', $upgrade->protocol);
+
+        $this->app->get('/ws/orders', ['Sec-WebSocket-Protocol' => "keel, keel.token.$token"])->assertStatus(400); // not an upgrade
+    }
+
+    public function testOrdersArePublishedToTheTenantsLiveChannel(): void
+    {
+        $received = [];
+        $this->app->container()->get(\Keel\Realtime\Hub::class)->subscribe('orders.' . self::TENANT_ID, static function (string $m) use (&$received): void {
+            $received[] = json_decode($m, true);
+        });
+        $id = $this->app->post('/orders', self::order(), $this->user)->assertStatus(201)->get('id');
+        self::assertSame([['orderId' => $id, 'totalCents' => 900]], $received);
+    }
+
     public function testOpenApiIsGeneratedFromTheTypes(): void
     {
         $file = $this->app->application->manifest->directory . '/openapi.json';
