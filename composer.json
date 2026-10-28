@@ -1,0 +1,51 @@
+{
+    "name": "keel/framework",
+    "description": "The typed, long-running, API-first PHP framework for SaaS backends.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["framework", "api", "worker", "frankenphp", "roadrunner", "typed", "saas"],
+    "require": {
+        "php": ">=8.3",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "nyholm/psr7": "^1.8",
+        "psr/clock": "^1.0",
+        "psr/container": "^2.0",
+        "psr/event-dispatcher": "^1.0",
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.0",
+        "psr/http-message": "^2.0",
+        "psr/http-server-handler": "^1.0",
+        "psr/http-server-middleware": "^1.0",
+        "psr/log": "^3.0"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.0",
+        "phpunit/phpunit": "^11.0"
+    },
+    "suggest": {
+        "ext-curl": "Required for the non-blocking HTTP client",
+        "ext-pcntl": "Graceful shutdown on SIGTERM in long-running workers",
+        "ext-pdo": "Database layer",
+        "ext-redis": "Shared stores for rate limiting and idempotency across nodes",
+        "spiral/roadrunner-http": "Run under RoadRunner"
+    },
+    "autoload": {
+        "psr-4": { "Keel\\": "src/" },
+        "files": ["src/Async/functions.php"]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Keel\\Tests\\": "tests/",
+            "Shop\\": "examples/shop/src/"
+        }
+    },
+    "bin": ["bin/keel"],
+    "scripts": {
+        "test": "phpunit",
+        "analyse": "phpstan analyse --memory-limit=1G",
+        "check": ["@analyse", "@test"]
+    },
+    "config": { "sort-packages": true },
+    "minimum-stability": "stable"
+}

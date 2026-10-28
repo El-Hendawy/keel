@@ -1,0 +1,15 @@
+# RoadRunner: composer require spiral/roadrunner-http, then `rr serve` from examples/shop.
+version: "3"
+
+server:
+  command: "php public/index.php"
+  env:
+    - KEEL_ENV: prod
+
+http:
+  address: 0.0.0.0:8080
+  pool:
+    num_workers: 8
+    max_jobs: 1000          # recycle workers, like KEEL_MAX_REQUESTS under FrankenPHP
+    supervisor:
+      max_worker_memory: 256

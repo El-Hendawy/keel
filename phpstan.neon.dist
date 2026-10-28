@@ -1,0 +1,12 @@
+parameters:
+    level: max
+    paths:
+        - src
+        - examples/shop/src
+    # Symbols that only exist under FrankenPHP or with spiral/roadrunner-http installed.
+    scanFiles:
+        - stubs/frankenphp.stub
+        - stubs/roadrunner.stub
+    excludePaths:
+        - src/Runtime/dev-router.php
+    tmpDir: var/phpstan

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4', '8.5']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, mbstring, pdo_sqlite, pcntl, redis
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - name: Static analysis (framework and example)
+        run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+      - name: Tests
+        run: vendor/bin/phpunit
+      - name: Static analysis (generated code)
+        run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress -c phpstan.neon.dist examples/shop/var/build/test
+      - name: Production build and checks
+        working-directory: examples/shop
+        env:
+          METRICS_TOKEN: ci
+        run: |
+          php ../../bin/keel build --env=prod
+          php ../../bin/keel check --env=prod
+      - name: Kernel benchmark
+        run: php -d opcache.enable_cli=1 benchmarks/kernel.php | tee benchmark.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-php${{ matrix.php }}
+          path: benchmark.txt

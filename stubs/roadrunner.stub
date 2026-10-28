@@ -1,0 +1,33 @@
+<?php
+
+namespace Spiral\RoadRunner {
+    interface WorkerInterface
+    {
+        public function error(string $error): void;
+    }
+
+    final class Worker implements WorkerInterface
+    {
+        public static function create(): self {}
+
+        public function error(string $error): void {}
+    }
+}
+
+namespace Spiral\RoadRunner\Http {
+    final class PSR7Worker
+    {
+        public function __construct(
+            \Spiral\RoadRunner\WorkerInterface $worker,
+            \Psr\Http\Message\ServerRequestFactoryInterface $requestFactory,
+            \Psr\Http\Message\StreamFactoryInterface $streamFactory,
+            \Psr\Http\Message\UploadedFileFactoryInterface $uploadsFactory,
+        ) {}
+
+        public function waitRequest(): ?\Psr\Http\Message\ServerRequestInterface {}
+
+        public function respond(\Psr\Http\Message\ResponseInterface $response): void {}
+
+        public function getWorker(): \Spiral\RoadRunner\WorkerInterface {}
+    }
+}

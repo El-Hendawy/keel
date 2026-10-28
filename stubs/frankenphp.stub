@@ -1,0 +1,4 @@
+<?php
+
+/** @param callable(): void $handler */
+function frankenphp_handle_request(callable $handler): bool {}

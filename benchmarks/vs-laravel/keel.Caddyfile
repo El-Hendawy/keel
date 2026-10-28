@@ -1,0 +1,18 @@
+{
+	admin off
+	auto_https off
+	frankenphp {
+		worker {
+			file ./public/index.php
+			num 8
+			env KEEL_ENV bench
+			env KEEL_DEBUG 0
+			env KEEL_MAX_REQUESTS 0
+		}
+	}
+}
+
+:8080 {
+	root * public/
+	php_server
+}

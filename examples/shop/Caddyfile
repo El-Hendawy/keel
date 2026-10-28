@@ -1,0 +1,15 @@
+# FrankenPHP in worker mode: the app boots once per worker and serves many requests.
+{
+	frankenphp {
+		worker {
+			file ./public/index.php
+			num 4
+			env KEEL_ENV prod
+		}
+	}
+}
+
+:8080 {
+	root * public/
+	php_server
+}

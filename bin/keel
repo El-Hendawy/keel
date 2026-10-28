@@ -1,0 +1,21 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+$candidates = [
+    $GLOBALS['_composer_autoload_path'] ?? null,          // set by Composer's bin proxy
+    getenv('COMPOSER_VENDOR_DIR') ? getenv('COMPOSER_VENDOR_DIR') . '/autoload.php' : null,
+    getcwd() . '/vendor/autoload.php',
+    __DIR__ . '/../vendor/autoload.php',
+    __DIR__ . '/../../../autoload.php',
+];
+foreach ($candidates as $autoload) {
+    if (is_string($autoload) && is_file($autoload)) {
+        require $autoload;
+        exit(Keel\Console\Cli::main($argv));
+    }
+}
+
+fwrite(STDERR, "Cannot find vendor/autoload.php. Run composer install.\n");
+exit(1);

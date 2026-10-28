@@ -1,0 +1,7 @@
+/vendor/
+/var/
+/examples/*/var/
+/composer.lock
+.phpunit.result.cache
+._*
+.DS_Store
