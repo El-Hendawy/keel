@@ -18,9 +18,9 @@ final class Frame
     public static function encode(int $opcode, string $payload, bool $fin = true): string
     {
         $length = \strlen($payload);
-        $head = \chr(($fin ? 0x80 : 0) | $opcode);
+        $head = pack('C', ($fin ? 0x80 : 0) | $opcode);
         if ($length < 126) {
-            $head .= \chr($length);
+            $head .= pack('C', $length);
         } elseif ($length < 65536) {
             $head .= \chr(126) . pack('n', $length);
         } else {
@@ -34,9 +34,9 @@ final class Frame
     public static function encodeMasked(int $opcode, string $payload, string $mask, bool $fin = true): string
     {
         $length = \strlen($payload);
-        $head = \chr(($fin ? 0x80 : 0) | $opcode);
+        $head = pack('C', ($fin ? 0x80 : 0) | $opcode);
         $head .= match (true) {
-            $length < 126 => \chr(0x80 | $length),
+            $length < 126 => pack('C', 0x80 | $length),
             $length < 65536 => \chr(0x80 | 126) . pack('n', $length),
             default => \chr(0x80 | 127) . pack('J', $length),
         };

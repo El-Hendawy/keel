@@ -72,7 +72,7 @@ final class Bson
             \is_array($value) => ($value !== [] && array_is_list($value) ? "\x04" : "\x03") . $name . self::encode($value),
             $value instanceof ObjectId => "\x07" . $name . $value->bytes,
             $value instanceof Int64 => "\x12" . $name . pack('P', $value->value),
-            $value instanceof Binary => "\x05" . $name . pack('V', \strlen($value->data)) . \chr($value->subtype) . $value->data,
+            $value instanceof Binary => "\x05" . $name . pack('V', \strlen($value->data)) . pack('C', $value->subtype) . $value->data,
             $value instanceof Decimal128 => "\x13" . $name . $value->bytes,
             $value instanceof \DateTimeInterface => "\x09" . $name . pack('P', (int) $value->format('U') * 1000 + (int) $value->format('v')),
             $value instanceof Timestamp => "\x11" . $name . pack('VV', $value->increment, $value->seconds),

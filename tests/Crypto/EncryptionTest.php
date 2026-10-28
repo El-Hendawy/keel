@@ -40,7 +40,10 @@ final class EncryptionTest extends TestCase
         self::assertFalse($crypto->isEncrypted('NL91ABNA0417164300'));
 
         $this->assertFails(static fn () => $crypto->decrypt($sealed, 'wallets.notes'), 'another context');
-        $tampered = substr($sealed, 0, -2) . (str_ends_with($sealed, 'A') ? 'BB' : 'AA');
+        [$version, $kid, $data] = explode('.', $sealed);
+        $raw = (string) base64_decode(strtr($data, '-_', '+/'));
+        $raw[14] = \chr(\ord($raw[14]) ^ 0x01);   // a ciphertext byte, after the 12-byte nonce
+        $tampered = "$version.$kid." . rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
         $this->assertFails(static fn () => $crypto->decrypt($tampered, 'wallets.iban'), 'altered');
         $this->assertFails(static fn () => $crypto->decrypt(str_replace('kv1.a.', 'kv1.b.', $sealed), 'wallets.iban'), 'unknown key id');
         $this->assertFails(static fn () => $crypto->decrypt('plaintext'), 'not a ciphertext');

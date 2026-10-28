@@ -60,6 +60,9 @@ final class Marshaler
     private static function from(array $attribute): mixed
     {
         $type = array_key_first($attribute);
+        if ($type === null) {
+            return null;
+        }
         $value = $attribute[$type];
 
         return match ($type) {

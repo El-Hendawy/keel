@@ -142,11 +142,11 @@ final class Jwk
     private static function oid(string $oid): string
     {
         $parts = array_map(intval(...), explode('.', $oid));
-        $body = \chr($parts[0] * 40 + $parts[1]);
+        $body = pack('C', $parts[0] * 40 + $parts[1]);
         foreach (\array_slice($parts, 2) as $part) {
-            $encoded = \chr($part & 0x7F);
+            $encoded = pack('C', $part & 0x7F);
             while (($part >>= 7) > 0) {
-                $encoded = \chr(0x80 | ($part & 0x7F)) . $encoded;
+                $encoded = pack('C', 0x80 | ($part & 0x7F)) . $encoded;
             }
             $body .= $encoded;
         }
@@ -157,10 +157,10 @@ final class Jwk
     private static function length(int $length): string
     {
         if ($length < 0x80) {
-            return \chr($length);
+            return pack('C', $length);
         }
         $bytes = ltrim(pack('N', $length), "\0");
 
-        return \chr(0x80 | \strlen($bytes)) . $bytes;
+        return pack('C', 0x80 | \strlen($bytes)) . $bytes;
     }
 }

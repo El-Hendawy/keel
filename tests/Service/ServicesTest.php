@@ -66,8 +66,11 @@ final class ServicesTest extends TestCase
 
     public function testBillingRefusesCallersWithoutTheScopeOrTheAudience(): void
     {
-        // A token for "orders" is not accepted by billing.
-        $this->billing->post('/invoices', ['orderId' => 'x'], $this->orders->tokenFor('user-1', 't1', ['*']))->assertStatus(401);
+        // A JWT meant for "orders" is not accepted by billing, even with every scope and the same signing key.
+        $jwt = $this->orders->container()->get(\Keel\Auth\Jwt\JwtTokens::class)->issue(new \Keel\Auth\Principal('service:x', 't1', ['*'], \Keel\Auth\Principal::SERVICE));
+        $this->billing->post('/invoices', ['orderId' => 'x'], ['Authorization' => "Bearer $jwt"])->assertStatus(401);
+        $forBilling = $this->orders->container()->get(\Keel\Auth\Jwt\JwtTokens::class)->issue(new \Keel\Auth\Principal('service:x', 't1', ['orders:read'], \Keel\Auth\Principal::SERVICE), audience: 'billing');
+        $this->billing->post('/invoices', ['orderId' => 'x'], ['Authorization' => "Bearer $forBilling"])->assertStatus(403);
         $this->billing->post('/invoices', ['orderId' => 'x'])->assertStatus(401);
     }
 
