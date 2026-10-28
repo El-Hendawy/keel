@@ -1,4 +1,84 @@
-.md-typeset .grid.cards > ul > li { border-radius: .4rem; }
-.md-typeset table:not([class]) { font-size: .72rem; }
-.keel-hero { text-align: center; margin: 1.5rem 0 2rem; }
-.keel-hero p.tagline { font-size: 1.15rem; opacity: .85; }
+/* The documentation in the Keel design system: the same tokens, fonts and square corners as the landing page. */
+:root {
+  --md-text-font: "Archivo";
+  --md-code-font: "JetBrains Mono";
+}
+
+[data-md-color-scheme="slate"] {
+  --md-hue: 210;
+  --md-default-bg-color: #0B1520;
+  --md-default-fg-color: #E6ECF2;
+  --md-default-fg-color--light: #94A3B4;
+  --md-default-fg-color--lighter: #5E6F82;
+  --md-default-fg-color--lightest: #2C3F56;
+  --md-primary-fg-color: #07101A;
+  --md-primary-fg-color--light: #101D2C;
+  --md-primary-fg-color--dark: #07101A;
+  --md-primary-bg-color: #E6ECF2;
+  --md-primary-bg-color--light: #94A3B4;
+  --md-accent-fg-color: #66E0D1;
+  --md-accent-fg-color--transparent: rgba(61, 214, 195, 0.1);
+  --md-typeset-a-color: #3DD6C3;
+  --md-code-bg-color: #040B12;
+  --md-code-fg-color: #D3DCE6;
+  --md-code-hl-keyword-color: #3DD6C3;
+  --md-code-hl-string-color: #D4A856;
+  --md-code-hl-name-color: #D3DCE6;
+  --md-code-hl-function-color: #8DB8E8;
+  --md-code-hl-constant-color: #D4A856;
+  --md-code-hl-number-color: #D4A856;
+  --md-code-hl-comment-color: #7A8CA2;
+  --md-footer-bg-color: #07101A;
+  --md-footer-bg-color--dark: #040B12;
+  --keel-divider: #2C3F56;
+  --keel-rule: #18273A;
+}
+
+[data-md-color-scheme="default"] {
+  --md-default-bg-color: #F5F7FA;
+  --md-default-fg-color: #0B1520;
+  --md-default-fg-color--light: #4A5869;
+  --md-default-fg-color--lighter: #7D8A99;
+  --md-default-fg-color--lightest: #BCC7D3;
+  --md-primary-fg-color: #12263F;
+  --md-primary-fg-color--light: #1B3350;
+  --md-primary-fg-color--dark: #0B1520;
+  --md-primary-bg-color: #F5F7FA;
+  --md-primary-bg-color--light: #C9D3DE;
+  --md-accent-fg-color: #08625A;
+  --md-accent-fg-color--transparent: rgba(10, 117, 104, 0.1);
+  --md-typeset-a-color: #0A7568;
+  --md-code-bg-color: #FFFFFF;
+  --md-code-fg-color: #1B2633;
+  --md-code-hl-keyword-color: #0A7568;
+  --md-code-hl-string-color: #8A5F0F;
+  --md-code-hl-function-color: #1F4F8A;
+  --md-code-hl-constant-color: #8A5F0F;
+  --md-code-hl-number-color: #8A5F0F;
+  --md-code-hl-comment-color: #5E6B7A;
+  --md-footer-bg-color: #0B1520;
+  --md-footer-bg-color--dark: #07101A;
+  --keel-divider: #BCC7D3;
+  --keel-rule: #D3DBE4;
+}
+
+.md-header { box-shadow: none; border-bottom: 2px solid var(--keel-divider); }
+.md-tabs { border-bottom: 1px solid var(--keel-rule); }
+.md-header__title { font-weight: 800; letter-spacing: -0.03em; }
+
+.md-typeset h1, .md-typeset h2, .md-typeset h3 { font-weight: 800; letter-spacing: -0.025em; color: var(--md-default-fg-color); }
+.md-typeset h1 { font-size: 2.2em; line-height: 1.05; }
+.md-typeset h2 { border-top: 2px solid var(--keel-divider); padding-top: 1.2em; }
+
+.md-typeset pre > code, .md-typeset .highlight, .md-typeset code { border-radius: 0; }
+.md-typeset pre > code { border: 1px solid var(--keel-rule); }
+.md-typeset :not(pre) > code { border: 1px solid var(--keel-rule); }
+.md-typeset .admonition, .md-typeset details { border-radius: 0; }
+.md-typeset table:not([class]) { font-size: .72rem; border-radius: 0; border-color: var(--keel-rule); }
+.md-typeset table:not([class]) th { background: transparent; border-bottom: 2px solid var(--keel-divider); text-transform: uppercase; letter-spacing: .06em; font-size: .62rem; }
+.md-typeset .md-button { border-radius: 0; font-weight: 800; }
+.md-typeset .md-button--primary { color: var(--md-default-bg-color); background: var(--md-typeset-a-color); border-color: var(--md-typeset-a-color); }
+.md-typeset .grid.cards > ul > li { border-radius: 0; border-color: var(--keel-divider); }
+.md-typeset .grid.cards > ul > li:hover { box-shadow: inset 0 3px 0 var(--md-typeset-a-color); border-color: var(--keel-divider); }
+.md-search__form, .md-search__input { border-radius: 0; }
+.md-nav__link--active, .md-nav__item .md-nav__link--active { color: var(--md-typeset-a-color); }

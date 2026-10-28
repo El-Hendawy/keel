@@ -8,25 +8,27 @@ copyright: Keel is MIT licensed.
 
 theme:
   name: material
+  custom_dir: overrides
   logo: assets/keel.svg
   favicon: assets/keel.svg
+  font: false
   icon:
     repo: fontawesome/brands/github
   palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: indigo
-      accent: teal
-      toggle:
-        icon: material/weather-night
-        name: Dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
-      accent: teal
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-sunny
         name: Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
   features:
     - navigation.instant
     - navigation.tracking
@@ -41,6 +43,7 @@ theme:
     - toc.follow
 
 extra_css:
+  - assets/fonts.css
   - assets/extra.css
 
 hooks:
@@ -76,6 +79,7 @@ validation:
 nav:
   - Home: index.md
   - Get started:
+      - Overview: overview.md
       - Tutorial: tutorial.md
       - Installation and first project: guide/getting-started.md
   - Guides:

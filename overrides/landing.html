@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keel: the typed, long-running PHP framework for SaaS backends</title>
+<meta name="description" content="{{ config.site_description }}">
+<link rel="canonical" href="{{ config.site_url }}">
+<link rel="icon" href="{{ 'assets/keel.svg' | url }}" type="image/svg+xml">
+<meta property="og:title" content="Keel">
+<meta property="og:description" content="{{ config.site_description }}">
+<meta property="og:url" content="{{ config.site_url }}">
+<script>
+  (function () {
+    var t = null;
+    try { t = new URLSearchParams(location.search).get('theme') || localStorage.getItem('keel-theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.dataset.theme = t;
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('motion');
+  })();
+</script>
+<link rel="stylesheet" href="{{ 'assets/fonts.css' | url }}">
+<link rel="stylesheet" href="{{ 'assets/landing.css' | url }}">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="top">
+  <div class="grid-lines" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+
+  <header class="wrap" style="position:relative">
+    <nav class="nav" aria-label="Primary">
+      <a class="brand" href="#top" aria-label="Keel home">
+        <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><rect x="6" y="2" width="5" height="20" fill="currentColor"/><path d="M11 13.5L20.5 2H26.5L11 20.5Z" fill="currentColor"/><path d="M15.2 13.5L18.1 10L28.1 22H22.2Z" fill="currentColor"/><rect x="2" y="24.5" width="28" height="2" fill="var(--color-accent)"/><rect x="6" y="24.5" width="5" height="6" fill="var(--color-accent)"/></svg>
+        <span>keel</span>
+      </a>
+      <div class="nav-links">
+        <a href="{{ 'overview/' | url }}">Docs</a>
+        <a href="{{ 'tutorial/' | url }}">Tutorial</a>
+        <a href="https://github.com/El-Hendawy/keel">GitHub</a>
+        <button type="button" class="icon-btn" id="theme" aria-label="Switch theme" title="Switch theme">
+          <svg class="when-dark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          <svg class="when-light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <section id="top" class="hero wrap" aria-labelledby="hero-h">
+    <p class="eyebrow" data-reveal><span class="accent">Developer preview 0.3</span><span>MIT licensed</span><span>PHP 8.3+</span></p>
+    <h1 id="hero-h">
+      <span data-reveal style="--d:60ms">The</span>
+      <span data-reveal style="--d:140ms">typed,</span>
+      <span data-reveal style="--d:220ms">long-running</span>
+      <span data-reveal style="--d:300ms">PHP</span>
+      <span data-reveal style="--d:380ms">framework</span>
+      <span data-reveal style="--d:460ms">for</span>
+      <span data-reveal style="--d:540ms">SaaS</span>
+      <span data-reveal style="--d:620ms" class="accent">backends.</span>
+    </h1>
+    <p class="lede" data-reveal style="--d:760ms">Compiled before deploy. Secure by default. Built to run for years.</p>
+    <div class="actions" data-reveal style="--d:880ms">
+      <a class="btn btn-primary" href="{{ 'tutorial/' | url }}">Start the tutorial<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+      <a class="btn btn-secondary" href="https://github.com/El-Hendawy/keel"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>GitHub</a>
+    </div>
+    <div class="install" data-reveal style="--d:1000ms">
+      <code><span class="co" aria-hidden="true">$</span><span>composer require el-hendawy/keel</span></code>
+      <button type="button" class="copy" data-copy="composer require el-hendawy/keel" aria-label="Copy install command"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span aria-live="polite">Copy</span></button>
+    </div>
+    <div class="hero-mark" aria-hidden="true">
+      <svg viewBox="0 0 32 32"><path pathLength="1" d="M6 2H11V22H6Z"/><path pathLength="1" d="M11 13.5L20.5 2H26.5L11 20.5Z"/><path pathLength="1" d="M15.2 13.5L18.1 10L28.1 22H22.2Z"/><rect class="wl" x="2" y="24.5" width="28" height="2" fill="var(--color-accent)"/><rect class="kl" x="6" y="24.5" width="5" height="6" fill="var(--color-accent)"/></svg>
+    </div>
+  </section>
+
+  <div class="waterline" aria-hidden="true">
+    <svg viewBox="0 0 1200 24" preserveAspectRatio="none" width="100%" height="24"><path class="w300" data-wave="300 1.6" stroke-width="1" opacity="0.3"/><path class="w140" data-wave="140 1" stroke-width="1" opacity="0.2"/><path class="w200" data-wave="200 2.4" stroke-width="1.5"/></svg>
+  </div>
+  <p class="below" aria-hidden="true">Below the waterline</p>
+</div>
+
+<main id="main">
+  <section class="block first wrap" aria-labelledby="types-h">
+    <div class="split" data-reveal>
+      <div>
+        <p class="num">01</p>
+        <h2 id="types-h">Types are the contract.</h2>
+      </div>
+      <p class="intro">One input class is the validation, the OpenAPI documentation and the client SDK. Send the wrong shape and you get every error at once, with its path.</p>
+    </div>
+    <div class="panels" data-reveal style="--d:120ms">
+      <div class="panel">
+        <div class="panel-bar"><span>src/Orders/CreateOrder.php</span><span>endpoint</span></div>
+        <div class="code"><div>
+          <div class="l"><span class="at">#[Post(</span><span class="st">'/orders'</span><span class="at">)]</span></div>
+          <div class="l"><span class="at">#[Status(201)]</span></div>
+          <div class="l"><span class="at">#[Authorize(scopes: [</span><span class="st">'orders:write'</span><span class="at">])]</span></div>
+          <div class="l"><span class="kw">final class</span> <span class="ty">CreateOrder</span></div>
+          <div class="l">{</div>
+          <div class="l i1"><span class="kw">public function</span> __invoke(<span class="ty">CreateOrderInput</span> $in, <span class="ty">Orders</span> $orders): <span class="ty">OrderResource</span></div>
+          <div class="l i1">{</div>
+          <div class="l i2"><span class="kw">return</span> <span class="ty">OrderResource</span>::from($orders-&gt;create($in));</div>
+          <div class="l i1">}</div>
+          <div class="l">}</div>
+        </div></div>
+        <div class="panel-bar"><span>src/Orders/CreateOrderInput.php</span><span>input</span></div>
+        <div class="code grow"><div>
+          <div class="l"><span class="kw">final readonly class</span> <span class="ty">CreateOrderInput</span></div>
+          <div class="l">{</div>
+          <div class="l i1"><span class="kw">public function</span> __construct(</div>
+          <div class="l i2"><span class="at">#[Uuid]</span> <span class="kw">public</span> <span class="ty">string</span> $merchantId,</div>
+          <div class="l i2"><span class="co">/** @var list&lt;LineItem&gt; */</span></div>
+          <div class="l i2"><span class="at">#[Count(min: 1)]</span> <span class="kw">public</span> <span class="ty">array</span> $items,</div>
+          <div class="l i1">) {}</div>
+          <div class="l">}</div>
+        </div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-bar"><span>POST /orders</span><span>request</span></div>
+        <div class="code"><div class="l">{<span class="ty">"merchantID"</span>: <span class="st">"x"</span>, <span class="ty">"items"</span>: []}</div></div>
+        <div class="panel-bar"><span>422 Unprocessable Content</span><span class="accent">automatic</span></div>
+        <div class="code grow flush"><div>
+          <div class="l p0">{</div>
+          <div class="l p1"><span class="ty">"status"</span>: <span class="at">422</span>,</div>
+          <div class="l p1"><span class="ty">"errors"</span>: [</div>
+          <div class="err" data-reveal style="--d:500ms">{<span class="ty">"path"</span>: <span class="st">"merchantID"</span>, <span class="ty">"code"</span>: <span class="kw">"unknown_field"</span>},</div>
+          <div class="err" data-reveal style="--d:750ms">{<span class="ty">"path"</span>: <span class="st">"merchantId"</span>, <span class="ty">"code"</span>: <span class="kw">"required"</span>},</div>
+          <div class="err" data-reveal style="--d:1000ms">{<span class="ty">"path"</span>: <span class="st">"items"</span>, <span class="ty">"code"</span>: <span class="kw">"count"</span>}</div>
+          <div class="l p1">]</div>
+          <div class="l p0">}</div>
+        </div></div>
+        <dl>
+          <div><dt>unknown</dt><dd>Fields the class does not declare are refused, not ignored.</dd></div>
+          <div><dt>required</dt><dd>A non-nullable property with no default must be sent.</dd></div>
+          <div><dt>count</dt><dd>Constraints are attributes on the same property.</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <section class="block wrap" aria-labelledby="feat-h">
+    <div class="section-head" data-reveal>
+      <p class="num">02</p>
+      <h2 id="feat-h">What is in the box.</h2>
+    </div>
+    <ul class="features">
+      <li data-reveal style="--d:0ms">
+        <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.33-6 4Z"/></svg>
+        <h3><a href="{{ 'guide/server/' | url }}">Compiled &amp; concurrent</a></h3>
+        <p>Routes, DI, validation and serialization compile to plain PHP. <code>keel run</code> serves many requests per process on an event loop, with non-blocking PostgreSQL and Redis.</p>
+      </li>
+      <li data-reveal style="--d:70ms">
+        <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+        <h3><a href="{{ 'guide/auth/' | url }}">Secure by default</a></h3>
+        <p>Every endpoint requires authentication unless marked <code>#[Anonymous]</code>. Tokens are bound to their client, DPoP and OpenID Connect built in. Production refuses unsafe settings.</p>
+      </li>
+      <li data-reveal style="--d:140ms">
+        <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
+        <h3><a href="{{ 'guide/tenancy/' | url }}">Multi-tenancy in SQL</a></h3>
+        <p>Tenant isolation is enforced in the SQL itself. Not by convention, not by a filter you have to remember.</p>
+      </li>
+      <li data-reveal style="--d:210ms">
+        <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+        <h3><a href="{{ 'guide/orm/' | url }}">A compiled ORM, checked by PHPStan</a></h3>
+        <p>No lazy loading, no hidden queries. SQLite, PostgreSQL, MySQL, SQL Server and Oracle.</p>
+      </li>
+      <li data-reveal style="--d:280ms">
+        <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+        <h3><a href="{{ 'guide/background-work/' | url }}">Jobs &amp; transactional outbox</a></h3>
+        <p>Jobs written in the same transaction as your data, relayed to Redis Streams, SQS or RabbitMQ. A scheduler and signed webhooks.</p>
+      </li>
+      <li data-reveal style="--d:350ms">
+        <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+        <h3><a href="{{ 'guide/realtime/' | url }}">Real time</a></h3>
+        <p>WebSockets and server-sent events on the same endpoints and auth as the rest of the API, with a hub across nodes.</p>
+      </li>
+      <li data-reveal style="--d:420ms">
+        <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/></svg>
+        <h3><a href="{{ 'guide/toon/' | url }}">Agent-friendly</a></h3>
+        <p>OpenAPI and a TypeScript SDK from your types. TOON, a token-efficient format for AI agents. <code>keel inspect</code>.</p>
+      </li>
+      <li data-reveal style="--d:490ms">
+        <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>
+        <h3><a href="{{ 'guide/observability/' | url }}">Observable</a></h3>
+        <p>Traces, metrics and logs, from the first request.</p>
+      </li>
+      <li data-reveal style="--d:560ms">
+        <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 3-4 4 4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
+        <h3><a href="{{ 'guide/fix/' | url }}">Native FIX protocol</a></h3>
+        <p>A FIX trading-protocol engine, native to the framework.</p>
+      </li>
+    </ul>
+  </section>
+
+  <section class="block wrap" aria-labelledby="perf-h">
+    <div class="section-head" data-reveal>
+      <p class="num">03</p>
+      <h2 id="perf-h">Performance.</h2>
+    </div>
+    <div class="perf">
+      <figure>
+        <table>
+          <caption>A 10 ms PostgreSQL query per request, 512 connections, 8 processes.</caption>
+          <thead><tr><th scope="col">Server</th><th scope="col">req/s</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>keel run</code>, non-blocking driver<div class="bar" aria-hidden="true"><div data-bar style="--w:100%;width:100%;--d:0ms"></div></div></th><td data-count="17027">17,027</td></tr>
+            <tr><th scope="row">FrankenPHP, 64 workers<div class="bar dim" aria-hidden="true"><div data-bar style="--w:33.7%;width:33.7%;--d:120ms"></div></div></th><td data-count="5734">5,734</td></tr>
+          </tbody>
+        </table>
+      </figure>
+      <div class="claim" data-reveal style="--d:200ms">
+        <p class="big">3×</p>
+        <p>the throughput of 64 FrankenPHP workers when requests wait on the database, in about the same memory (244 MB).</p>
+        <a class="more" href="{{ 'guide/server/#benchmark' | url }}">Method and caveats<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+      </div>
+    </div>
+    <div class="perf">
+      <figure>
+        <table>
+          <caption>One worker, in-process, PHP 8.3, Apple silicon.</caption>
+          <thead><tr><th scope="col">Request</th><th scope="col">req/s</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Health check<div class="bar" aria-hidden="true"><div data-bar style="--w:100%;width:100%;--d:0ms"></div></div></th><td data-count="51600">51,600</td></tr>
+            <tr><th scope="row">Authenticated read<div class="bar" aria-hidden="true"><div data-bar style="--w:45.3%;width:45.3%;--d:120ms"></div></div></th><td data-count="23400">23,400</td></tr>
+            <tr><th scope="row">Validation error<div class="bar" aria-hidden="true"><div data-bar style="--w:57.6%;width:57.6%;--d:240ms"></div></div></th><td data-count="29700">29,700</td></tr>
+            <tr><th scope="row">Create order, with transaction<div class="bar" aria-hidden="true"><div data-bar style="--w:25.9%;width:25.9%;--d:360ms"></div></div></th><td data-count="13350">13,350</td></tr>
+          </tbody>
+        </table>
+      </figure>
+      <div class="claim" data-reveal style="--d:200ms">
+        <p class="big">2×<span>–</span>6.3×</p>
+        <p>more requests per second than Laravel Octane, end to end on PostgreSQL (v0.1).</p>
+        <a class="more" href="https://github.com/El-Hendawy/keel/tree/main/benchmarks/vs-laravel">Method and caveats<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="surface" id="binding" aria-labelledby="sec-h">
+    <div class="wrap">
+      <div class="split" data-reveal>
+        <div>
+          <p class="num">04</p>
+          <h2 id="sec-h">A stolen token is worth nothing.</h2>
+        </div>
+        <p class="intro">Tokens are bound to the client that holds them. Copy one to another machine and Keel refuses it, then revokes it.</p>
+      </div>
+      <ol class="steps">
+        <li><div class="track" aria-hidden="true"><div></div></div><span class="n">1</span><h3>Issued</h3><p>Client A signs in and receives a token.</p><code class="chip">token · active</code></li>
+        <li><div class="track" aria-hidden="true"><div></div></div><span class="n">2</span><h3>Bound to client</h3><p>The token only works from client A.</p><code class="chip">token · client A</code></li>
+        <li><div class="track" aria-hidden="true"><div></div></div><span class="n">3</span><h3>Replayed</h3><p>Someone copies it and calls the API from client B.</p><code class="chip dashed">token · from client B</code></li>
+        <li><div class="track" aria-hidden="true"><div></div></div><span class="n accent">4</span><h3 class="accent">Refused and revoked</h3><p>The request is refused. The token is revoked for everyone.</p><code class="chip revoked">token · revoked</code></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="block wrap" style="padding-top:clamp(64px,9vw,120px)" aria-labelledby="start-h">
+    <div class="start">
+      <div data-reveal>
+        <p class="num">05</p>
+        <h2 id="start-h">Five-minute start.</h2>
+        <p class="intro">Install the <code>keel</code> command, create an app, serve it. Then follow the tutorial from your first endpoint to production.</p>
+        <a class="btn btn-primary" href="{{ 'tutorial/' | url }}">Start the tutorial<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+      </div>
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span>terminal</span>
+          <button type="button" class="copy" data-copy="composer global require el-hendawy/keel&#10;keel new acme &amp;&amp; cd acme &amp;&amp; composer install&#10;keel serve" aria-label="Copy all commands"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span aria-live="polite">Copy</span></button>
+        </div>
+        <div class="code"><div>
+          <div class="l" data-reveal style="--d:200ms"><span class="co">$ </span>composer global require el-hendawy/keel</div>
+          <div class="l" data-reveal style="--d:650ms"><span class="co">$ </span>keel new acme <span class="kw">&amp;&amp;</span> cd acme <span class="kw">&amp;&amp;</span> composer install</div>
+          <div class="l" data-reveal style="--d:1100ms"><span class="co">$ </span>keel serve<span class="cursor" aria-hidden="true"></span></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap footer-top">
+    <div class="footer-brand">
+      <div>
+        <svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><rect x="6" y="2" width="5" height="20" fill="currentColor"/><path d="M11 13.5L20.5 2H26.5L11 20.5Z" fill="currentColor"/><path d="M15.2 13.5L18.1 10L28.1 22H22.2Z" fill="currentColor"/><rect x="2" y="24.5" width="28" height="2" fill="var(--color-accent)"/><rect x="6" y="24.5" width="5" height="6" fill="var(--color-accent)"/></svg>
+        <span>keel</span>
+      </div>
+      <p>MIT licensed · Developer preview 0.3</p>
+    </div>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="{{ 'overview/' | url }}">Docs</a>
+      <a href="{{ 'tutorial/' | url }}">Tutorial</a>
+      <a href="{{ 'manifesto/' | url }}">Manifesto</a>
+      <a href="https://github.com/El-Hendawy/keel">GitHub</a>
+      <a href="https://github.com/El-Hendawy/keel/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/El-Hendawy/keel/blob/main/SECURITY.md">Security policy</a>
+    </nav>
+  </div>
+  <div class="wrap" aria-hidden="true"><div class="wordmark">keel</div></div>
+</footer>
+
+<script src="{{ 'assets/landing.js' | url }}" defer></script>
+</body>
+</html>

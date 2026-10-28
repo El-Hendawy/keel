@@ -33,6 +33,8 @@ listed under **Breaking** with an upgrade note.
 - `Database` leases connections from the `ConnectionManager` instead of using a shared PDO directly.
   `ConnectionManager::prepare()` is gone; use `acquire()`/`release()` or `with()`.
 - `Application::boot()` accepts `defaults` (applied under config.php).
+- The documentation site opens on a new landing page, and the docs use the Keel design system (Archivo,
+  JetBrains Mono, self-hosted). The former home page is now `overview`.
 
 ### Fixed
 
