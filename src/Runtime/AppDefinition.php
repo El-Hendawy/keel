@@ -57,6 +57,8 @@ final class AppDefinition
 
     private bool $queue = false;
 
+    private bool $messageEncryption = false;
+
     /** @var 'json'|'toon'|null the default format when TOON is enabled */
     private ?string $toon = null;
 
@@ -286,6 +288,59 @@ final class AppDefinition
         return $this;
     }
 
+    /**
+     * Microservices: `Services` (calls to other services with credentials, trace, request id and
+     * deadline propagated), `DeadlineMiddleware`, `IntegrationEvents` (CloudEvents through the
+     * outbox, delivered by the queue) and, with ->withDatabase(), `Inbox` (`keel_inbox`) to handle
+     * each incoming event once. Configure under `service`, `services` and `events`.
+     */
+    public function withServices(): self
+    {
+        if ($this->database) {
+            $this->migrations[] = \dirname(__DIR__) . '/Service/migrations';
+            $this->register(\Keel\Service\Inbox::class);
+        }
+
+        return $this
+            ->register(\Keel\Service\Services::class, \Keel\Service\ServiceTokens::class, \Keel\Service\IntegrationEvents::class, \Keel\Service\DeliverIntegrationEvent::class)
+            ->middleware(\Keel\Service\DeadlineMiddleware::class);
+    }
+
+    /**
+     * Non-relational databases: `NoSqlConnections` (MongoDB, DynamoDB, Elasticsearch/OpenSearch,
+     * CouchDB, Neo4j, InfluxDB, configured under `nosql`) and `DocumentStore` bound to the store
+     * named by `nosql.store`. The production checks refuse the in-memory store.
+     */
+    public function withDocumentStore(): self
+    {
+        $this->bindings[\Keel\NoSql\DocumentStore::class] = \Keel\NoSql\ConfiguredDocumentStore::class;
+
+        return $this->register(\Keel\NoSql\NoSqlConnections::class);
+    }
+
+    /**
+     * A double-entry, hash-chained ledger in the application database (`Ledger`), with its
+     * tables in the framework migrations. Requires ->withDatabase().
+     */
+    public function withLedger(): self
+    {
+        $this->migrations[] = \dirname(__DIR__) . '/Ledger/migrations';
+
+        return $this->register(\Keel\Ledger\Ledger::class);
+    }
+
+    /**
+     * End-to-end message encryption: JWE request bodies (ECDH-ES, A256GCM) are decrypted before
+     * routing, and responses are encrypted to the key a client sends in `Keel-E2E-Key`. Server
+     * keys come from `crypto.e2e.keys`; `crypto.e2e.required` lists paths that refuse plaintext.
+     */
+    public function withMessageEncryption(): self
+    {
+        $this->messageEncryption = true;
+
+        return $this->register(\Keel\Crypto\MessageEncryptionMiddleware::class);
+    }
+
     public function withoutOperationalEndpoints(): self
     {
         $this->operationalEndpoints = false;
@@ -370,6 +425,11 @@ final class AppDefinition
     public function hasQueue(): bool
     {
         return $this->queue;
+    }
+
+    public function hasMessageEncryption(): bool
+    {
+        return $this->messageEncryption;
     }
 
     public function hasTokenBinding(): bool

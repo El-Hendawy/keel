@@ -100,7 +100,7 @@ final readonly class JwtTokens
         $jti = $claims['jti'] ?? null;
 
         return [
-            'principal' => new Principal($sub, \is_string($tenant) ? $tenant : null, $scopes, Principal::USER, \is_string($jti) ? $jti : null, $claims),
+            'principal' => new Principal($sub, \is_string($tenant) ? $tenant : null, $scopes, \in_array($claims['knd'] ?? null, [Principal::API_KEY, Principal::SERVICE], true) && !$fromProvider ? (string) $claims['knd'] : Principal::USER, \is_string($jti) ? $jti : null, $claims),
             'binding' => $binding,
             'jkt' => $jkt,
         ];
@@ -108,9 +108,10 @@ final readonly class JwtTokens
 
     /**
      * Issues a short-lived JWT signed with `auth.jwt.signing_key` (a kid in auth.jwt.keys),
-     * or with a key derived from app.key when none is configured.
+     * or with a key derived from app.key when none is configured. $audience overrides
+     * `auth.jwt.audience`, e.g. for a token meant for another service.
      */
-    public function issue(Principal $principal, ?Fingerprint $boundTo = null, ?int $ttlSeconds = null, ?string $dpopKey = null): string
+    public function issue(Principal $principal, ?Fingerprint $boundTo = null, ?int $ttlSeconds = null, ?string $dpopKey = null, ?string $audience = null): string
     {
         $now = $this->clock->now()->getTimestamp();
         $claims = [
@@ -126,8 +127,11 @@ final readonly class JwtTokens
         if ($this->issuer !== '') {
             $claims['iss'] = $this->issuer;
         }
-        if ($this->audience !== '') {
-            $claims['aud'] = $this->audience;
+        if (($audience ?? $this->audience) !== '') {
+            $claims['aud'] = $audience ?? $this->audience;
+        }
+        if ($principal->kind !== Principal::USER) {
+            $claims['knd'] = $principal->kind;
         }
         $cnf = [];
         if ($boundTo !== null && !$boundTo->without('dpop')->isEmpty()) {

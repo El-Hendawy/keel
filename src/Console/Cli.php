@@ -53,6 +53,14 @@ final class Cli
           make:endpoint <Name> --method=POST --path=/things [--scope=things:write]
           make:migration <name>
 
+          crypto:e2e-key    Print a new key pair for end-to-end message encryption [--kid=ID]
+          orm:reencrypt <C> Rewrite an entity's #[Encrypted] columns with the current key
+          ledger:verify     Check the ledger's hash chain
+
+          deploy:docker     Write a production Dockerfile (keel run, build in the image)
+          deploy:kubernetes Write Deployment, Service, autoscaler and disruption budget
+                            --name=orders --image=registry/orders:1.0 [--replicas=2 --max-replicas=10]
+
         Options:
           --app=<file>      Application file (default: ./app.php)
           --env=<name>      Environment (default: KEEL_ENV or dev)
@@ -92,6 +100,16 @@ final class Cli
                 'key:generate' => self::out('base64:' . base64_encode(random_bytes(32))),
                 'make:endpoint' => self::makeEndpoint($arguments[0] ?? null, $options),
                 'make:migration' => self::out("Created:\n  " . implode("\n  ", (new CodeGenerator((string) getcwd()))->migration($arguments[0] ?? throw new \InvalidArgumentException('Usage: keel make:migration <name>'), $options['dir'] ?? 'migrations'))),
+                'deploy:docker' => self::out("Created:\n  " . implode("\n  ", (new DeploymentGenerator((string) getcwd()))->docker())),
+                'deploy:kubernetes' => self::out("Created:\n  " . implode("\n  ", (new DeploymentGenerator((string) getcwd()))->kubernetes(
+                    $options['name'] ?? throw new \InvalidArgumentException('Usage: keel deploy:kubernetes --name=orders --image=registry.example.com/orders:1.0 [--replicas=2 --max-replicas=10]'),
+                    $options['image'] ?? throw new \InvalidArgumentException('Usage: keel deploy:kubernetes --name=orders --image=registry.example.com/orders:1.0'),
+                    (int) ($options['replicas'] ?? 2),
+                    (int) ($options['max-replicas'] ?? 10),
+                ))),
+                'crypto:e2e-key' => self::e2eKey($options['kid'] ?? gmdate('Y-m') . '-' . bin2hex(random_bytes(2))),
+                'orm:reencrypt' => self::reencrypt($appFile, $env, $arguments[0] ?? throw new \InvalidArgumentException('Usage: keel orm:reencrypt <Entity class>')),
+                'ledger:verify' => self::ledgerVerify($appFile, $env),
                 'version', '--version', '-V' => self::out(Keel::VERSION),
                 default => self::out(\sprintf(self::HELP, Keel::VERSION), $command === null || \in_array($command, ['help', '--help', '-h'], true) ? 0 : 1),
             };
@@ -218,6 +236,48 @@ final class Cli
         passthru($command, $code);
 
         return $code;
+    }
+
+    private static function e2eKey(string $kid): int
+    {
+        $pair = \Keel\Crypto\MessageKeys::generate($kid);
+        fwrite(\STDOUT, "Private key (config crypto.e2e.keys.$kid; keep it secret, e.g. in an environment variable):\n\n{$pair['private']}\n");
+        fwrite(\STDOUT, "Public key (what clients encrypt to; also served at /.well-known/keel-e2e-keys):\n\n" . json_encode($pair['public'], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES) . "\n");
+
+        return 0;
+    }
+
+    private static function reencrypt(string $appFile, string $env, string $class): int
+    {
+        if (!class_exists($class)) {
+            throw new \InvalidArgumentException("Class $class does not exist. Pass the entity's full class name, e.g. 'App\\Wallets\\Wallet'.");
+        }
+        $app = Application::boot($appFile, ['env' => $env]);
+        $scope = $app->container()->createScope();
+        try {
+            $count = $scope->get(\Keel\Orm\Orm::class)->reencrypt($class);
+        } finally {
+            $scope->dispose();
+        }
+
+        return self::out("Re-encrypted $count row(s) of $class with the current key.");
+    }
+
+    private static function ledgerVerify(string $appFile, string $env): int
+    {
+        $app = Application::boot($appFile, ['env' => $env]);
+        $scope = $app->container()->createScope();
+        try {
+            $count = $scope->get(\Keel\Ledger\Ledger::class)->verify();
+        } catch (\Keel\Ledger\LedgerTampered $e) {
+            fwrite(\STDERR, $e->getMessage() . "\n");
+
+            return 1;
+        } finally {
+            $scope->dispose();
+        }
+
+        return self::out("The ledger's $count transaction(s) match their hash chain.");
     }
 
     /** @param array<string, string> $options */

@@ -53,15 +53,38 @@ final readonly class CreateOrderInput
 | `#[Uuid]`, `#[Email]`, `#[Url]` | string | `uuid`, `email`, `url` |
 | `#[Range(min, max)]` | int, float | `range` |
 | `#[Count(min, max)]` | list | `count` |
+| `#[Decimal(scale, positive)]` | string holding an exact decimal (`"12.50"`) | `decimal` |
+| `#[CurrencyCode]` | string (ISO 4217) | `currency` |
+| `#[Iban]`, `#[Bic]`, `#[CardNumber]` | string | `iban`, `bic`, `card_number` |
 
-Type errors use `type`, missing fields `required`, nulls `null`, bad enum values `enum`.
+Type errors use `type`, missing fields `required`, nulls `null`, bad enum values `enum`. For financial types
+(`Money`, the ledger) see [fintech](fintech.md).
+
+### Rules across fields
+
+A constructor can enforce rules that involve several fields by throwing `ValidationFailed`. Its violations
+are reported with the others, under the object's path, as a 422:
+
+```php
+final readonly class DateRange
+{
+    public function __construct(public \DateTimeImmutable $from, public \DateTimeImmutable $to)
+    {
+        if ($to < $from) {
+            throw new ValidationFailed([new Violation('to', 'range', 'Must not be before "from".')]);
+        }
+    }
+}
+```
+
+Nested in an input as `period`, a bad range is reported at `period.to`. `Money` validates its scale this way.
 
 A custom constraint implements `Keel\Validation\Constraint`. Its `compile()` returns a PHP expression that is
 inlined into the generated hydrator, so it costs nothing at runtime beyond the check itself:
 
 ```php
 #[Attribute(Attribute::TARGET_PARAMETER | Attribute::TARGET_PROPERTY)]
-final readonly class Currency implements Constraint
+final readonly class Supported implements Constraint
 {
     public function supports(string $kind): bool { return $kind === 'string'; }
     public function compile(string $value): string { return "\\in_array($value, ['EUR', 'USD', 'GBP'], true)"; }

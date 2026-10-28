@@ -22,6 +22,8 @@ jobs:
       - run: composer install --no-interaction --no-progress
       - name: Static analysis (framework and example)
         run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+      - name: JOSE interoperability tooling (jwcrypto)
+        run: pip install --user jwcrypto
       - name: Tests
         run: vendor/bin/phpunit
       - name: Static analysis (generated code)
@@ -86,7 +88,7 @@ jobs:
           KEEL_TEST_DATABASE_DSN: ${{ matrix.dsn }}
           KEEL_TEST_PGSQL_DSN: 'pgsql:host=127.0.0.1;port=5432;dbname=keel_test;user=keel;password=keel'
           KEEL_TEST_REDIS_URL: redis://127.0.0.1:6379
-        run: vendor/bin/phpunit tests/Http tests/Auth tests/Queue tests/Orm tests/Database tests/Server
+        run: vendor/bin/phpunit tests/Http tests/Auth tests/Queue tests/Orm tests/Database tests/Server tests/Crypto tests/Ledger tests/Service
 
   brokers:
     # The queue transports against real RabbitMQ and an SQS-compatible server.
@@ -116,6 +118,50 @@ jobs:
           KEEL_TEST_SQS_ENDPOINT: http://127.0.0.1:9324/
           KEEL_TEST_REDIS_URL: redis://127.0.0.1:6379
         run: vendor/bin/phpunit tests/Queue/TransportTest.php
+
+  nosql:
+    # The non-relational drivers against real servers: the DocumentStore contract on each, and
+    # the MongoDB wire protocol (with SCRAM-SHA-256 authentication).
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        env:
+          MONGO_INITDB_ROOT_USERNAME: keel
+          MONGO_INITDB_ROOT_PASSWORD: keel-secret
+        ports: ['27017:27017']
+      dynamodb:
+        image: amazon/dynamodb-local
+        ports: ['8000:8000']
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: 'false'
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports: ['9200:9200']
+        options: --health-cmd "curl -fs http://localhost:9200/_cluster/health" --health-interval 5s --health-timeout 5s --health-retries 30
+      couchdb:
+        image: couchdb:3.4
+        env:
+          COUCHDB_USER: keel
+          COUCHDB_PASSWORD: keel-secret
+        ports: ['5984:5984']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: curl, mbstring, pdo_sqlite
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - name: NoSQL tests
+        env:
+          KEEL_TEST_MONGODB_URL: mongodb://keel:keel-secret@127.0.0.1:27017/keel_test?authSource=admin
+          KEEL_TEST_DYNAMODB_ENDPOINT: http://127.0.0.1:8000
+          KEEL_TEST_ELASTICSEARCH_URL: http://127.0.0.1:9200
+          KEEL_TEST_COUCHDB_URL: http://keel:keel-secret@127.0.0.1:5984
+        run: vendor/bin/phpunit tests/NoSql
 
   docs:
     runs-on: ubuntu-latest

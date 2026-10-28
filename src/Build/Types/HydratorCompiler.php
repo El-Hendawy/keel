@@ -130,9 +130,19 @@ final class HydratorCompiler
         $lines[] = '    return null;';
         $lines[] = '}';
         $lines[] = '';
+        // A constructor may enforce rules across fields by throwing ValidationFailed; its
+        // violations are reported under this object's path like any other.
+        $lines[] = 'try {';
         $lines[] = $args === []
-            ? "return new \\$class();"
-            : "return new \\$class(\n    " . implode(",\n    ", $args) . ",\n);";
+            ? "    return new \\$class();"
+            : "    return new \\$class(\n        " . implode(",\n        ", $args) . ",\n    );";
+        $lines[] = '} catch (\\Keel\\Validation\\ValidationFailed $e) {';
+        $lines[] = '    foreach ($e->violations as $violation) {';
+        $lines[] = "        \$errors[] = new Violation(\$violation->path === '' ? \$path : Violation::at(\$path, \$violation->path), \$violation->code, \$violation->message);";
+        $lines[] = '    }';
+        $lines[] = '';
+        $lines[] = '    return null;';
+        $lines[] = '}';
 
         $body = implode("\n", array_map(static fn (string $l): string => $l === '' ? '' : '        ' . $l, explode("\n", implode("\n", $lines))));
 

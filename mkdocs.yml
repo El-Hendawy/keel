@@ -93,6 +93,10 @@ nav:
       - Background work: guide/background-work.md
       - The Keel server: guide/server.md
       - Real time (WebSockets, SSE): guide/realtime.md
+      - Microservices: guide/microservices.md
+      - Encryption (at rest, end to end): guide/encryption.md
+      - Money, ledgers and payments: guide/fintech.md
+      - Non-relational databases: guide/nosql.md
       - Cache and pagination: guide/cache-and-pagination.md
       - Concurrency: guide/concurrency.md
       - TOON: guide/toon.md

@@ -312,7 +312,9 @@ final class Query extends Criteria
         foreach ($values as $property => $value) {
             $column = EntityMap::column($this->meta, $property);
             $set[] = $this->dialect->quote($column['column']) . ' = ?';
-            $params[] = EntityMap::toDb($column, $value, $this->dialect);
+            $params[] = ($column['encrypted'] ?? false)
+                ? $this->map->sealValue($this->meta['class'], $column['column'], \is_array($value) ? Values::toJson($value) : (\is_string($value) || $value === null ? $value : throw new \InvalidArgumentException("{$column['column']} is #[Encrypted]: set a string or an array.")))
+                : EntityMap::toDb($column, $value, $this->dialect);
         }
         if ($this->meta['updatedAt'] !== null && !isset($values[$this->meta['updatedAt']])) {
             $set[] = $this->dialect->quote($this->meta['columns'][$this->meta['updatedAt']]['column']) . ' = ?';

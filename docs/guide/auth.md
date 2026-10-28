@@ -107,7 +107,8 @@ Keel verifies JWTs from your identity provider:
 - Scopes come from `scope` (space separated) or `scp` (array).
 - `JwtTokens::issue($principal, $fingerprint)` issues short-lived JWTs of your own (`auth.jwt.ttl_seconds`,
   default 15 minutes), bound with a `cnf.kfp` claim. Without configured keys they are signed with a key
-  derived from `app.key`.
+  derived from `app.key`. `audience:` overrides `auth.jwt.audience` (tokens for another service), and a
+  principal of kind `service` or `api_key` keeps its kind (claim `knd`); see [microservices](microservices.md).
 
 JWTs cannot be revoked before they expire; keep them short-lived and use opaque tokens for long sessions and
 API keys.

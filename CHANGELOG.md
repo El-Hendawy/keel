@@ -7,6 +7,32 @@ listed under **Breaking** with an upgrade note.
 
 ### Added
 
+- **Encryption.** `Encrypter`: AES-256-GCM with a key ring (`crypto.keys`, `crypto.current`), authenticated
+  key ids and contexts, rotation. `#[Encrypted]` entity columns (string or array), transparent to the entity,
+  with `Orm::reencrypt()` / `keel orm:reencrypt` after a rotation. **End-to-end message encryption**
+  (`->withMessageEncryption()`): JWE (ECDH-ES, A256GCM) request bodies decrypted before routing, responses
+  encrypted to the client's key (`Keel-E2E-Key`), required per path, public keys at
+  `/.well-known/keel-e2e-keys`, `keel crypto:e2e-key`; interoperable with JOSE libraries (tested against
+  jwcrypto).
+- **Money and ledgers.** `Money` (integer minor units, ISO 4217 scales, rounding modes, lossless
+  allocation) as a domain and API type; constraints `Decimal`, `CurrencyCode`, `Iban`, `Bic`, `CardNumber`;
+  `->withLedger()`: a double-entry ledger with balanced, idempotent postings, overdraft limits, reversals,
+  history and a gapless hash chain (`Ledger::verify()`, `keel ledger:verify`).
+- **Microservices.** `->withServices()`: `Services` calls other services by name with a service token
+  (`service.auth`: jwt, client_credentials or none), the tenant, the request id and the remaining deadline;
+  `DeadlineMiddleware` (`Keel-Timeout-Ms`, `grpc-timeout`); `IntegrationEvents` publishes CloudEvents
+  through the outbox; `Inbox` handles each delivered event once (`keel_inbox`). `keel deploy:docker` and
+  `keel deploy:kubernetes` write a production Dockerfile and a Deployment, Service, autoscaler and
+  disruption budget.
+- **Non-relational databases.** `->withDocumentStore()` and `NoSqlConnections`: a MongoDB client in PHP
+  (OP_MSG, BSON with Decimal128, SCRAM-SHA-256, TLS, `mongodb+srv`, primary discovery), DynamoDB (SigV4),
+  Elasticsearch/OpenSearch, CouchDB, Neo4j (Cypher over HTTP) and InfluxDB (line protocol, Flux); a common
+  `DocumentStore` with MongoDB, DynamoDB, search, CouchDB and in-memory implementations. All go through
+  Keel's HTTP client or event loop, so they are non-blocking under `keel run`.
+- Input constructors may throw `ValidationFailed` for rules across fields; the violations are reported
+  under the object's path.
+- `JwtTokens::issue()` takes an `audience`, and service and API-key principals keep their kind (`knd`).
+
 - **`keel run`**: Keel's own HTTP/1.1 server. Many requests per process on the event loop (a fiber per
   connection), keep-alive, chunked bodies, limits and timeouts, a supervisor that runs N processes on one
   socket, restarts crashed ones and drains on SIGTERM. Singletons are shared by a process's requests.
@@ -33,6 +59,8 @@ listed under **Breaking** with an upgrade note.
 - `Database` leases connections from the `ConnectionManager` instead of using a shared PDO directly.
   `ConnectionManager::prepare()` is gone; use `acquire()`/`release()` or `with()`.
 - `Application::boot()` accepts `defaults` (applied under config.php).
+- `EntityMap` takes an `Encrypter` (it is a container service; only code that constructs it by hand is
+  affected).
 - The documentation site opens on a new landing page, and the docs use the Keel design system (Archivo,
   JetBrains Mono, self-hosted). The former home page is now `overview`.
 

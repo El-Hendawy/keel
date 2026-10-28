@@ -41,6 +41,19 @@ keel make:migration "add refunds"
 from `composer.json`, with `#[Authorize]` when you pass `--scope`. The endpoint returns 501 until you
 implement it. Nothing is overwritten.
 
+## Deploying
+
+```bash
+keel deploy:docker                                                        # Dockerfile + .dockerignore
+keel deploy:kubernetes --name=orders --image=registry.example.com/orders:1.0 [--replicas=2 --max-replicas=10]
+```
+
+The Dockerfile installs the extensions `keel run` uses, compiles the build into the image, runs as
+`www-data`, and starts `keel run` on port 8080. The Kubernetes file has a Deployment (startup, liveness and
+readiness probes on the health endpoints, a pre-stop pause so endpoints update before the drain, no root, no
+privilege escalation), a Service, a HorizontalPodAutoscaler and a PodDisruptionBudget. Secrets come from a
+Secret named `<name>-secrets`. Nothing is overwritten. See [microservices](microservices.md).
+
 ## Client SDK
 
 ```bash
@@ -91,6 +104,14 @@ from the API.
 | `keel key:generate` | Prints a new `app.key` (`base64:...`) |
 | `keel token:issue --principal=ID [--tenant=ID] [--scopes=a,b] [--kind=api_key] [--ttl=0] [--name=..]` | Issues a token, bound to the first client that uses it. Shown once. |
 | `keel token:revoke <id>` | Revokes a token |
+
+## Encryption and the ledger
+
+| Command | What it does |
+| --- | --- |
+| `keel crypto:e2e-key [--kid=ID]` | Prints a new P-256 key pair for end-to-end message encryption |
+| `keel orm:reencrypt <Entity class>` | Rewrites an entity's `#[Encrypted]` columns with the current key, after a rotation |
+| `keel ledger:verify` | Recomputes the ledger's hash chain; exits 1 and names the first bad transaction |
 
 ## Background work
 

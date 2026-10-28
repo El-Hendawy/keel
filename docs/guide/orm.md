@@ -68,6 +68,8 @@ final class Post
   `generated: 'auto'` is a database sequence read back after insert; `generated: 'none'` means you always set
   it.
 - Entities can be `readonly` when nothing in them is managed by the ORM (see `Tag` in the tests).
+- `#[Encrypted]` stores a string or array column encrypted with AES-256-GCM; the entity sees plaintext.
+  Encrypted columns cannot be filtered or indexed. See [encryption](encryption.md).
 
 The compiler rejects, with the class and the fix: no `#[Id]`, two entities on one table, unsupported types, a
 relation that is not a `Many`/`One` with a default, a relation to a non-entity, a foreign key that is not a

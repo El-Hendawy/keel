@@ -18,6 +18,9 @@ final class RequestContext
     public string $clientIp = '';
     public float $startedAt;
 
+    /** When the caller stops waiting (microtime), from `Keel-Timeout-Ms`; null when unbounded. */
+    public ?float $deadline = null;
+
     public function __construct()
     {
         $this->startedAt = microtime(true);

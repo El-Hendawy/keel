@@ -186,6 +186,38 @@ final class Orm
     }
 
     /**
+     * Rewrites every #[Encrypted] column of an entity with the current key (`crypto.current`),
+     * across tenants and including soft-deleted rows. Run it after rotating keys, then remove the
+     * old key. Rows are streamed, so memory stays flat.
+     *
+     * @param class-string $class
+     * @return int rows rewritten
+     */
+    public function reencrypt(string $class, int $batch = 500): int
+    {
+        $meta = $this->map->meta($class);
+        $columns = array_keys($this->map->encryptedColumns($class));
+        if ($columns === []) {
+            return 0;
+        }
+        $dialect = $this->dialect();
+        $sql = 'UPDATE ' . $this->q($meta['table']) . ' SET ' . implode(', ', array_map(fn (string $c): string => $this->q($c) . ' = ?', $columns))
+            . ' WHERE ' . $this->q($meta['idColumn']) . ' = ?';
+
+        return $this->tenant->acrossTenants(function () use ($class, $meta, $columns, $dialect, $sql, $batch): int {
+            $count = 0;
+            foreach ($this->query($class)->unsafeAcrossTenants()->withTrashed()->lazy($batch) as $entity) {
+                $row = $this->map->seal($class, $this->map->extract($entity, $dialect));
+                $params = array_map(static fn (string $c): string|int|float|bool|null => $row[$c] ?? null, $columns);
+                $params[] = $row[$meta['idColumn']] ?? null;
+                $count += $this->db->executeBuilt($sql, $params);
+            }
+
+            return $count;
+        });
+    }
+
+    /**
      * Eager-loads relations onto entities already fetched: load($orders, 'lines.product').
      *
      * @param object|list<object> $entities
@@ -361,7 +393,7 @@ final class Orm
             unset($row[$meta['idColumn']]);
         }
 
-        return $row;
+        return $this->map->seal($entity::class, $row);
     }
 
     /** @param Meta $meta */
@@ -390,7 +422,7 @@ final class Orm
         $params = [];
         foreach ($columns as $column) {
             $set[] = $this->q($column) . ' = ?';
-            $params[] = $current[$column];
+            $params[] = $this->map->sealValue($entity::class, $column, $current[$column]);
         }
         [$where, $whereParams] = $this->rowCondition($entity, $meta, $id, $previousVersion);
         $affected = $this->db->executeBuilt('UPDATE ' . $this->q($meta['table']) . ' SET ' . implode(', ', $set) . $where, [...$params, ...$whereParams]);

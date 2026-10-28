@@ -52,7 +52,7 @@ final readonly class Schema
             foreach ($meta['columns'] as $property => $column) {
                 $mapped[] = strtolower($column['column']);
                 if (!\in_array(strtolower($column['column']), $existing, true)) {
-                    $definition = $this->dialect->columnType($column) . ($column['nullable'] ? ' NULL' : ' NOT NULL' . $this->defaultFor($column));
+                    $definition = $this->dialect->columnType(($column['encrypted'] ?? false) ? ['type' => 'text'] + $column : $column) . ($column['nullable'] ? ' NULL' : ' NOT NULL' . $this->defaultFor($column));
                     $sql[] = 'ALTER TABLE ' . $this->q($meta['table']) . ' ADD ' . ($this->dialect->name() === 'sqlsrv' || $this->dialect->name() === 'oci' ? '' : 'COLUMN ') . $this->q($column['column']) . ' ' . $definition;
                     if (($column['unique'] ?? false) || ($column['index'] ?? false)) {
                         $sql[] = $this->index($meta['table'], [$column['column']], $column['unique'] ?? false);
@@ -85,7 +85,7 @@ final readonly class Schema
                 $lines[] = $this->dialect->autoIncrement($column['column']);
                 continue;
             }
-            $line = $this->q($column['column']) . ' ' . $this->dialect->columnType($column) . ($column['nullable'] ? ' NULL' : ' NOT NULL');
+            $line = $this->q($column['column']) . ' ' . $this->dialect->columnType(($column['encrypted'] ?? false) ? ['type' => 'text'] + $column : $column) . ($column['nullable'] ? ' NULL' : ' NOT NULL');
             if ($property === $meta['id']) {
                 $line .= ' PRIMARY KEY';
             }

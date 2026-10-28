@@ -54,7 +54,10 @@ SDK, plus a compiled ORM for every PDO database, TOON as a wire format, and a na
 v0.3 adds `keel run`, Keel's own server: many requests per process on an event loop, non-blocking
 PostgreSQL and Redis, WebSockets and server-sent events. It also adds OpenID Connect with key rotation,
 DPoP proof-of-possession tokens, broker transports (Redis Streams, SQS, RabbitMQ), and a PHPStan
-extension that checks ORM queries. Everything below is implemented and tested; items marked *planned* are on the
+extension that checks ORM queries, and then encryption at rest and end to end, money and a hash-chained
+ledger, microservice plumbing (service identity, deadlines, CloudEvents with outbox and inbox, Kubernetes
+manifests) and drivers for MongoDB, DynamoDB, Elasticsearch/OpenSearch, CouchDB, Neo4j and InfluxDB.
+Everything below is implemented and tested; items marked *planned* are on the
 [roadmap](docs/manifesto.md#roadmap).
 
 | Area | What you get |
@@ -64,7 +67,11 @@ extension that checks ORM queries. Everything below is implemented and tested; i
 | Container | Compiled to plain PHP; `Singleton` / `Scoped` / `Transient` lifetimes; a Singleton depending on a Scoped service (directly or through Transients) is a **build error**; cycles and missing bindings reported with a fix |
 | Routing | Attribute routes on invokable classes, static map plus combined regexes, typed path parameters (`int` only matches digits), 404/405 with `Allow`, named routes |
 | Typed I/O | Generated hydrators: strict types, unknown fields rejected, every violation with its path (`items[0].sku`); query strings coerced; outputs serialized from public properties; arrays are rejected as contracts at build time |
-| Validation | `Uuid`, `Email`, `Url`, `Length`, `Count`, `Range`, `Pattern`, `NotBlank`, backed enums, RFC 3339 dates; custom rules compile to inline PHP |
+| Validation | `Uuid`, `Email`, `Url`, `Length`, `Count`, `Range`, `Pattern`, `NotBlank`, `Decimal`, `CurrencyCode`, `Iban`, `Bic`, `CardNumber`, backed enums, RFC 3339 dates; custom rules compile to inline PHP; constructors can enforce cross-field rules |
+| Encryption | AES-256-GCM `Encrypter` with a key ring and rotation; `#[Encrypted]` entity columns; **end-to-end encrypted request and response bodies** (JWE, ECDH-ES + A256GCM, interoperable with JOSE libraries) with `->withMessageEncryption()` ([guide](docs/guide/encryption.md)) |
+| Fintech | Exact `Money` (ISO 4217 scales, seven rounding modes, lossless allocation) usable as an API type; a **double-entry ledger** with idempotent postings, overdraft limits, reversals and a verifiable hash chain ([guide](docs/guide/fintech.md)) |
+| Microservices | `->withServices()`: calls by service name with service tokens (JWT or OAuth client credentials), tenant, trace, request id and **deadline propagation**; CloudEvents through the outbox and an exactly-once `Inbox`; `keel deploy:docker` and `deploy:kubernetes` ([guide](docs/guide/microservices.md)) |
+| Non-relational | MongoDB (wire protocol, SCRAM, Decimal128), DynamoDB, Elasticsearch/OpenSearch, CouchDB, Neo4j and InfluxDB in PHP, non-blocking under `keel run`; one `DocumentStore` interface ([guide](docs/guide/nosql.md)) |
 | Wire formats | JSON, and [TOON](docs/guide/toon.md) (Token-Oriented Object Notation) with `->withToon()`: negotiated by `Accept`, accepted as request bodies, listed in OpenAPI |
 | FIX | Native [FIX](docs/guide/fix.md) engine (`keel fix:run`): acceptor and initiator sessions, logon, sequence recovery with resend and gap fill, heartbeats, rejects; typed messages and repeating groups compiled at build time; handlers per message type |
 | OpenAPI and SDK | OpenAPI 3.1 generated from the same types, including security; `keel sdk` writes a typed, dependency-free TypeScript client |
@@ -72,7 +79,7 @@ extension that checks ORM queries. Everything below is implemented and tested; i
 | Concurrency | Fibers with structured concurrency: `await_all()` with timeouts and cancellation; non-blocking HTTP client (curl_multi), **non-blocking PostgreSQL** (`pgsql-async:` DSN, pooled per request) and Redis pub/sub |
 | HTTP client | PSR-18, timeouts always set, per-host circuit breaker and bulkhead, trace propagation, RED metrics |
 | ORM | Compiled data mapper ([guide](docs/guide/orm.md)): plain typed entities, no lazy loading (unloaded relations throw), **queries checked by PHPStan** (names, value types, operators), identity map with dirty-column updates, optimistic locking, automatic tenant scoping, soft deletes, timestamps, `whereHas`, eager loading in one query per relation, keyset `cursorPaginate()`, `lazy()` streaming, upserts, pivots, schema generation and forward-only diff. Dialects for SQLite, PostgreSQL, MySQL/MariaDB, SQL Server, Oracle and standard SQL for other PDO drivers |
-| Database | Parameterised SQL with `literal-string` enforcement, typed `Row`s, read/write splitting with read-your-writes, statement timeouts, result-size cap, savepoints, prepared-statement cache, N+1 detection (fails tests), forward-only migrations. Tested on SQLite, PostgreSQL and MySQL. ORM/entity mapping: *planned* |
+| Database | Parameterised SQL with `literal-string` enforcement, typed `Row`s, read/write splitting with read-your-writes, statement timeouts, result-size cap, savepoints, prepared-statement cache, N+1 detection (fails tests), forward-only migrations. Tested on SQLite, PostgreSQL and MySQL |
 | Auth | `->withAuth()`: **deny by default** (`#[Anonymous]` opts out), `#[Authorize(scopes, policy)]` compiled into endpoints, `Principal` injection, hashed opaque tokens (`keel_...`) and JWTs (HS/RS/ES, no algorithm confusion). **Tokens are bound to the client's fingerprint by default**: a stolen token used from another client is refused and revoked. OpenID Connect providers with JWKS key rotation, the PKCE login flow, and **DPoP** proof-of-possession tokens ([guide](docs/guide/auth.md)) |
 | Tenancy | Tenant from the principal, never from client input. The tenant guard refuses SQL on tenant tables that does not filter by the current tenant; `acrossTenants()` is the named exception; PostgreSQL row-level security support |
 | Background work | `->withQueue()`: typed jobs with retries, backoff and failed-job tooling; **transactional outbox** (jobs commit with your data); async listeners; cron scheduler that runs each task once across nodes; distributed locks; broker transports: Redis Streams, Amazon SQS (SigV4, no SDK) and RabbitMQ, fed by the outbox |
@@ -82,7 +89,7 @@ extension that checks ORM queries. Everything below is implemented and tested; i
 | Safety defaults | Rate limiting, idempotency keys, load shedding, body limits, security headers, `trustProxy()` named as unsafe, problem+json errors, production boot checks (debug, local-only stores, public metrics, missing `app.key`) |
 | Testing | In-process `TestApp`; frozen clock, seeded randomness, sequential ids and a fake HTTP client are bound automatically in `test`; `tokenFor()`, `runJobs()`, `runSchedule()`; the same tests run on SQLite, PostgreSQL or MySQL (`KEEL_TEST_DATABASE_DSN`) |
 | Tooling | `keel new`, `build`, `routes`, `inspect` (JSON for agents), `openapi`, `sdk`, `check`, `migrate`, `serve`, `make:endpoint`, `make:migration`, `token:*`, `key:generate`, `queue:*`, `schedule:*` ([reference](docs/guide/tooling.md)) |
-| Planned | Non-blocking MySQL, gRPC, WebSocket compression, typed JSON columns, tenant connection routing, FIX over TLS |
+| Planned | Non-blocking MySQL, gRPC, WebSocket compression, typed JSON columns, tenant connection routing, FIX over TLS, Cassandra (CQL), MongoDB transactions |
 
 Quality bar, enforced in CI: PHPStan **level max** with zero errors on the framework, the example
 application **and the generated code**.
@@ -166,7 +173,8 @@ The site at <https://el-hendawy.github.io/keel/> is built from `docs/` on every 
   [auth and token binding](docs/guide/auth.md) · [tenancy](docs/guide/tenancy.md) ·
   [background work](docs/guide/background-work.md) · [cache and pagination](docs/guide/cache-and-pagination.md) ·
   [ORM](docs/guide/orm.md) · [the Keel server](docs/guide/server.md) · [real time](docs/guide/realtime.md) ·
-  [TOON](docs/guide/toon.md) · [FIX](docs/guide/fix.md) ·
+  [TOON](docs/guide/toon.md) · [FIX](docs/guide/fix.md) · [microservices](docs/guide/microservices.md) ·
+  [encryption](docs/guide/encryption.md) · [money and ledgers](docs/guide/fintech.md) · [non-relational databases](docs/guide/nosql.md) ·
   [concurrency](docs/guide/concurrency.md) · [database](docs/guide/database.md) ·
   [observability](docs/guide/observability.md) · [production](docs/guide/production.md) · [testing](docs/guide/testing.md) ·
   [tooling](docs/guide/tooling.md)

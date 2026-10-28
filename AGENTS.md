@@ -25,6 +25,10 @@ Instructions for coding agents and new contributors working on this repository.
 | `src/Http/Toon` | TOON encoder/decoder; negotiation is `Http/Middleware/ContentNegotiationMiddleware` |
 | `src/Fix`, `src/Build/Fix` | FIX codec, session, engine, gateway, and the typed-message compiler |
 | `examples/fix-gateway` | A FIX venue used by the end-to-end FIX test |
+| `src/Crypto` | `Encrypter` (data at rest), JWE and end-to-end message encryption |
+| `src/Money`, `src/Ledger` | Exact money and the double-entry, hash-chained ledger |
+| `src/Service` | Microservices: service calls and tokens, deadlines, CloudEvents, the inbox |
+| `src/NoSql` | MongoDB (wire protocol, BSON), DynamoDB, Elasticsearch/OpenSearch, CouchDB, Neo4j, InfluxDB, `DocumentStore` |
 | `src/Database`, `src/Observability`, `src/Events`, `src/Module`, `src/Testing`, `src/Console` | As named |
 | `examples/shop` | The reference application; the end-to-end tests run against it |
 | `tests/Fixtures` | Small applications that must fail or succeed to build |

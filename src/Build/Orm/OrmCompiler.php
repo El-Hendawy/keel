@@ -87,6 +87,15 @@ final class OrmCompiler
             }
             $definition['column'] = $column->name ?? self::snake($name);
             $definition['readonly'] = $property->isReadOnly();
+            if ($parameter->getAttributes(A\Encrypted::class) !== []) {
+                $special = array_filter([A\Id::class, A\TenantKey::class, A\Version::class, A\CreatedAt::class, A\UpdatedAt::class, A\SoftDelete::class], static fn (string $a): bool => $parameter->getAttributes($a) !== []);
+                if (!\in_array($definition['type'], ['string', 'text', 'json'], true) || $special !== []) {
+                    $this->errors[] = "$where: #[Encrypted] needs a plain string or array column (not an id, tenant key, version or timestamp).";
+                } elseif (($definition['unique'] ?? false) || ($definition['index'] ?? false)) {
+                    $this->errors[] = "$where: an #[Encrypted] column cannot be unique or indexed: equal values encrypt differently.";
+                }
+                $definition['encrypted'] = true;
+            }
             $columns[$name] = $definition;
 
             $idAttribute = ($parameter->getAttributes(A\Id::class)[0] ?? null)?->newInstance();

@@ -494,6 +494,10 @@ final class Builder
                 $middleware[] = \Keel\Auth\AuthenticationMiddleware::class;
             }
             $middleware[] = $class;
+            if ($class === \Keel\Http\Middleware\RequestContextMiddleware::class && $this->app->hasMessageEncryption()) {
+                // Outside content negotiation and everything that reads bodies.
+                $middleware[] = \Keel\Crypto\MessageEncryptionMiddleware::class;
+            }
         }
 
         return $middleware;

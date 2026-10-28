@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Keel\Orm;
 
 use Keel\Container\Attribute\Singleton;
+use Keel\Crypto\Encrypter;
 use Keel\Orm\Dialect\Dialect;
 use Keel\Runtime\BuildManifest;
 
 /**
  * The compiled entity metadata and generated mappers.
  *
- * @phpstan-type Column array{type: string, nullable: bool, column: string, readonly: bool, length?: int, precision?: int, scale?: int, enum?: class-string<\BackedEnum>, enum_int?: bool, unique?: bool, index?: bool}
+ * @phpstan-type Column array{type: string, nullable: bool, column: string, readonly: bool, length?: int, precision?: int, scale?: int, enum?: class-string<\BackedEnum>, enum_int?: bool, unique?: bool, index?: bool, encrypted?: bool}
  * @phpstan-type Relation array{kind: string, target: class-string, key: string, orderBy?: ?string, pivot?: string, local?: string, related?: string}
  * @phpstan-type Meta array{class: class-string, table: string, id: string, idColumn: string, idGenerated: string, tenant: ?string, version: ?string, createdAt: ?string, updatedAt: ?string, softDelete: ?string, columns: array<string, Column>, relations: array<string, Relation>, indexes: list<array{columns: list<string>, unique: bool}>, managed: list<string>, hydrator: string, extractor: string, setter: string}
  */
@@ -23,7 +24,10 @@ final readonly class EntityMap
 
     private string $mappers;
 
-    public function __construct(BuildManifest $manifest)
+    /** @var array<class-string, array<string, string>> column => encryption context, per entity */
+    private array $encrypted;
+
+    public function __construct(BuildManifest $manifest, private Encrypter $encrypter)
     {
         $class = $manifest->data['orm'] ?? null;
         $mappers = \is_string($class) && class_exists($class) ? $class : null;
@@ -31,6 +35,15 @@ final readonly class EntityMap
         $meta = $mappers !== null && \defined($mappers . '::META') ? \constant($mappers . '::META') : [];
         $this->meta = $meta;
         $this->mappers = $mappers ?? '';
+        $encrypted = [];
+        foreach ($meta as $class => $entity) {
+            foreach ($entity['columns'] as $column) {
+                if ($column['encrypted'] ?? false) {
+                    $encrypted[$class][$column['column']] = $entity['table'] . '.' . $column['column'];
+                }
+            }
+        }
+        $this->encrypted = $encrypted;
     }
 
     /**
@@ -58,6 +71,11 @@ final readonly class EntityMap
     {
         $hydrate = [$this->mappers, $this->meta($class)['hydrator']];
         \assert(\is_callable($hydrate));
+        foreach ($this->encrypted[$class] ?? [] as $column => $context) {
+            if (\is_string($row[$column] ?? null)) {
+                $row[$column] = $this->encrypter->decrypt($row[$column], $context);
+            }
+        }
         $entity = $hydrate($row);
         \assert($entity instanceof $class);
 
@@ -71,6 +89,41 @@ final readonly class EntityMap
         \assert(\is_callable($extract));
         /** @var array<string, scalar|null> */
         return $extract($entity, $dialect);
+    }
+
+    /**
+     * Encrypts the #[Encrypted] columns of an extracted row, just before it is written.
+     *
+     * @param class-string $class
+     * @param array<string, scalar|null> $row column => value
+     * @return array<string, scalar|null>
+     */
+    public function seal(string $class, array $row): array
+    {
+        foreach ($this->encrypted[$class] ?? [] as $column => $context) {
+            if (\array_key_exists($column, $row)) {
+                $row[$column] = $this->sealValue($class, $column, $row[$column]);
+            }
+        }
+
+        return $row;
+    }
+
+    /** @param class-string $class */
+    public function sealValue(string $class, string $column, string|int|float|bool|null $value): string|int|float|bool|null
+    {
+        $context = $this->encrypted[$class][$column] ?? null;
+
+        return $context === null || $value === null ? $value : $this->encrypter->encrypt((string) $value, $context);
+    }
+
+    /**
+     * @param class-string $class
+     * @return array<string, string> encrypted column => encryption context
+     */
+    public function encryptedColumns(string $class): array
+    {
+        return $this->encrypted[$class] ?? [];
     }
 
     public function set(object $entity, string $property, mixed $value): void
@@ -100,6 +153,10 @@ final readonly class EntityMap
      */
     public static function toDb(array $column, mixed $value, Dialect $dialect): string|int|float|bool|null
     {
+        if (($column['encrypted'] ?? false) && $value !== null) {
+            throw new \InvalidArgumentException("{$column['column']} is #[Encrypted]: it cannot be compared in SQL, because equal values encrypt differently. Filter on another column.");
+        }
+
         return match (true) {
             $value === null => null,
             $value instanceof \BackedEnum => $value->value,

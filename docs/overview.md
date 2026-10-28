@@ -113,6 +113,34 @@ validation code:
     A native FIX engine: sessions with sequence recovery and heartbeats, typed messages compiled at build
     time, handlers per message type.
 
+-   :material-lock: **Encryption**
+
+    ---
+
+    `#[Encrypted]` columns and key rotation (AES-256-GCM), and end-to-end encrypted request and response
+    bodies (JWE, ECDH-ES) on top of TLS.
+
+-   :material-bank: **Money and ledgers**
+
+    ---
+
+    Exact `Money`, IBAN/BIC/card validation, and a double-entry, hash-chained ledger with idempotent,
+    overdraft-checked postings.
+
+-   :material-hexagon-multiple: **Microservices**
+
+    ---
+
+    Service-to-service calls with identity, tenant, trace and deadline propagated; CloudEvents through the
+    outbox with an exactly-once inbox; Docker and Kubernetes manifests.
+
+-   :material-database-search: **Non-relational databases**
+
+    ---
+
+    MongoDB, DynamoDB, Elasticsearch/OpenSearch, CouchDB, Neo4j and InfluxDB drivers in PHP, non-blocking
+    under `keel run`, behind one `DocumentStore`.
+
 </div>
 
 ## Five minutes to a running API

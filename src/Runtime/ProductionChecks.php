@@ -51,6 +51,12 @@ final class ProductionChecks
         if (($config['metrics.enabled'] ?? true) !== false && ($config['metrics.token'] ?? '') === '') {
             $problems[] = 'The /metrics endpoint is public. Set metrics.token or metrics.enabled = false.';
         }
+        if (\in_array(\Keel\Crypto\MessageEncryptionMiddleware::class, $app->manifest->data['middleware'], true) && ($config['crypto.e2e.keys'] ?? []) === []) {
+            $problems[] = '->withMessageEncryption() is on but crypto.e2e.keys is empty, so encrypted requests cannot be read. Create a key with `keel crypto:e2e-key`.';
+        }
+        if (isset($app->manifest->bindings()[\Keel\NoSql\DocumentStore::class]) && ($config['nosql.store'] ?? 'memory') === 'memory') {
+            $problems[] = 'DocumentStore uses the in-memory store: documents would vanish on restart and differ per worker. Set nosql.store.';
+        }
         $key = $config['app.key'] ?? '';
         if (!\is_string($key) || \strlen(\Keel\Security\Keys::decode($key)) < 32) {
             $problems[] = 'app.key is missing or shorter than 32 bytes: token fingerprints, signed cursors and Keel-issued JWTs would use a public development key. Generate one with `keel key:generate` and set it from a secret (e.g. APP_KEY).';
