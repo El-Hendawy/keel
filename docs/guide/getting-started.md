@@ -2,11 +2,20 @@
 
 ## Create a project
 
+Requirements: PHP 8.3+ with `ext-json` and `ext-mbstring`, plus `ext-pdo` and the driver for your database,
+`ext-curl` for the HTTP client, `ext-pcntl` for graceful shutdown and `ext-redis` for shared stores.
+
 ```bash
-bin/keel new ../acme          # from a checkout of the framework
+git clone https://github.com/El-Hendawy/keel.git
+cd keel && composer install
+bin/keel new ../acme          # scaffold a project
 cd ../acme && composer install
 vendor/bin/keel serve         # development server on http://127.0.0.1:8000
 ```
+
+Until Keel is on Packagist, new projects install `keel/framework` from the GitHub repository (`dev-main`);
+the generated `composer.json` already declares it. The [tutorial](../tutorial.md) builds a complete API from
+here.
 
 The skeleton contains:
 

@@ -45,6 +45,8 @@ Toward phase 2, "Work", plus security and SaaS features.
 - **FIX**: tag=value codec and stream parser, a session state machine (logon, sequence recovery, heartbeats,
   rejects, logout), file-backed sequence stores, typed messages with repeating groups compiled at build time,
   `#[FixHandler]` dispatch, `FixGateway`, and the `keel fix:run` engine. Example: `examples/fix-gateway`.
+- Documentation site (MkDocs Material, deployed to GitHub Pages) with a tutorial; `keel new` projects
+  install `keel/framework` from GitHub; `TestResponse::assertJsonCount()`.
 - Prepared statements are cached per connection.
 - `app.key` with HKDF-derived keys per purpose; production refuses to boot without it.
 

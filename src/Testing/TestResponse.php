@@ -76,6 +76,15 @@ final readonly class TestResponse
         return $this;
     }
 
+    /** Asserts that the array at a dotted path (e.g. `data`) has $expected items. */
+    public function assertJsonCount(string $path, int $expected): self
+    {
+        $actual = $this->get($path);
+        self::check(\is_array($actual) && \count($actual) === $expected, \sprintf('Expected %s to have %d item(s), got %s.', $path, $expected, \is_array($actual) ? \count($actual) : get_debug_type($actual)));
+
+        return $this;
+    }
+
     public function assertHeader(string $name, ?string $expected = null): self
     {
         self::check($this->response->hasHeader($name), "Expected header $name to be present.");

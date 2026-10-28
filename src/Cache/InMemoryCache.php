@@ -74,8 +74,8 @@ final class InMemoryCache implements Cache
         Entry::check($value);
         unset($this->entries[$key]);
         $this->entries[$key] = new Entry($value, $ttlSeconds > 0 ? microtime(true) + $ttlSeconds : 0.0, $computeSeconds);
-        while (\count($this->entries) > $this->maxItems) {
-            unset($this->entries[array_key_first($this->entries)]);
+        while (\count($this->entries) > $this->maxItems && ($oldest = array_key_first($this->entries)) !== null) {
+            unset($this->entries[$oldest]);
         }
     }
 }

@@ -5,3 +5,4 @@
 .phpunit.result.cache
 ._*
 .DS_Store
+/site/

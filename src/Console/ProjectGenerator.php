@@ -33,7 +33,9 @@ final class ProjectGenerator
         $composer = [
             'name' => "app/$package",
             'type' => 'project',
-            'require' => ['php' => '>=8.3', 'keel/framework' => '^0.1'],
+            // Keel is not on Packagist yet: install it from its repository.
+            'repositories' => [['type' => 'vcs', 'url' => 'https://github.com/El-Hendawy/keel']],
+            'require' => ['php' => '>=8.3', 'keel/framework' => 'dev-main'],
             'require-dev' => ['phpstan/phpstan' => '^2.0', 'phpunit/phpunit' => '^11.0'],
             'autoload' => ['psr-4' => ["$namespace\\" => 'src/']],
             'autoload-dev' => ['psr-4' => ["$namespace\\Tests\\" => 'tests/']],
@@ -43,6 +45,8 @@ final class ProjectGenerator
                 'analyse' => 'phpstan analyse',
             ],
             'config' => ['sort-packages' => true],
+            'minimum-stability' => 'dev',
+            'prefer-stable' => true,
         ];
 
         return [

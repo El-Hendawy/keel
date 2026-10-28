@@ -1,0 +1,2 @@
+# Builds the documentation site (mkdocs.yml); used by .github/workflows/docs.yml.
+mkdocs-material==9.5.39

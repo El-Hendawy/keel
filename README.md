@@ -6,7 +6,8 @@ Keel boots once and serves many requests (FrankenPHP, RoadRunner, FPM as fallbac
 container, validation and serialization into plain PHP before deploy, so the hot path has no reflection.
 Types are the contract: one input class is the validation, the documentation and the API schema.
 
-> Read [the manifesto](docs/manifesto.md) for the why. This README covers the what and the how.
+> **Documentation: <https://el-hendawy.github.io/keel/>**, with a [tutorial](https://el-hendawy.github.io/keel/tutorial/)
+> that builds a multi-tenant API from scratch. Read [the manifesto](docs/manifesto.md) for the why.
 
 ```php
 #[Post('/orders')]
@@ -149,6 +150,9 @@ KEEL_ENV=prod vendor/bin/keel queue:work         # and schedule:work, as separat
 | End-to-end tests | [tests/Http/ShopTest.php](tests/Http/ShopTest.php) |
 
 ## Documentation
+
+The site at <https://el-hendawy.github.io/keel/> is built from `docs/` on every push to `main`
+(`mkdocs build --strict`; preview locally with `pip install -r requirements-docs.txt && mkdocs serve`).
 
 - [Manifesto](docs/manifesto.md): principles, what we reject, scalability, promises, roadmap, governance
 - [Architecture](docs/architecture.md): layers, the compiler, the request lifecycle, generated files

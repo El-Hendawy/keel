@@ -1,0 +1,100 @@
+site_name: Keel
+site_description: The typed, long-running, API-first PHP framework for SaaS backends.
+site_url: https://el-hendawy.github.io/keel/
+repo_url: https://github.com/El-Hendawy/keel
+repo_name: El-Hendawy/keel
+edit_uri: edit/main/docs/
+copyright: Keel is MIT licensed.
+
+theme:
+  name: material
+  logo: assets/keel.svg
+  favicon: assets/keel.svg
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+
+extra_css:
+  - assets/extra.css
+
+hooks:
+  - docs/hooks/links.py
+
+exclude_docs: |
+  hooks/
+  rfcs/
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+validation:
+  links:
+    not_found: warn
+    anchors: warn
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Tutorial: tutorial.md
+      - Installation and first project: guide/getting-started.md
+  - Guides:
+      - Endpoints and types: guide/endpoints-and-types.md
+      - Services and lifetimes: guide/services-and-lifetimes.md
+      - Modules: guide/modules.md
+      - Authentication and token binding: guide/auth.md
+      - Multi-tenancy: guide/tenancy.md
+      - Database: guide/database.md
+      - ORM: guide/orm.md
+      - Background work: guide/background-work.md
+      - Cache and pagination: guide/cache-and-pagination.md
+      - Concurrency: guide/concurrency.md
+      - TOON: guide/toon.md
+      - FIX protocol: guide/fix.md
+      - Observability: guide/observability.md
+      - Testing: guide/testing.md
+      - Production: guide/production.md
+  - Reference:
+      - Command line: guide/tooling.md
+      - Architecture: architecture.md
+      - Manifesto: manifesto.md
