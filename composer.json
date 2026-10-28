@@ -1,8 +1,14 @@
 {
-    "name": "keel/framework",
+    "name": "el-hendawy/keel",
     "description": "The typed, long-running, API-first PHP framework for SaaS backends.",
     "type": "library",
     "license": "MIT",
+    "homepage": "https://el-hendawy.github.io/keel/",
+    "support": {
+        "docs": "https://el-hendawy.github.io/keel/",
+        "issues": "https://github.com/El-Hendawy/keel/issues",
+        "source": "https://github.com/El-Hendawy/keel"
+    },
     "keywords": ["framework", "api", "worker", "frankenphp", "roadrunner", "typed", "saas"],
     "require": {
         "php": ">=8.3",
@@ -48,5 +54,8 @@
         "check": ["@analyse", "@test"]
     },
     "config": { "sort-packages": true },
+    "extra": {
+        "branch-alias": { "dev-main": "0.2.x-dev" }
+    },
     "minimum-stability": "stable"
 }

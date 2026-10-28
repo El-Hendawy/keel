@@ -13,8 +13,10 @@ cd ../acme && composer install
 vendor/bin/keel serve         # development server on http://127.0.0.1:8000
 ```
 
-Until Keel is on Packagist, new projects install `keel/framework` from the GitHub repository (`dev-main`);
-the generated `composer.json` already declares it. The [tutorial](../tutorial.md) builds a complete API from
+Keel's Composer package is `el-hendawy/keel` (namespace `Keel\`); until the first tagged release, it is
+installed from `main` (`^0.2@dev`), and the generated `composer.json` also lists the GitHub repository so it
+installs even before Packagist has it. To add Keel to an existing project:
+`composer require el-hendawy/keel:^0.2@dev`. The [tutorial](../tutorial.md) builds a complete API from
 here.
 
 The skeleton contains:

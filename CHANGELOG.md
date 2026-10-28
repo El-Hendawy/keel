@@ -46,7 +46,7 @@ Toward phase 2, "Work", plus security and SaaS features.
   rejects, logout), file-backed sequence stores, typed messages with repeating groups compiled at build time,
   `#[FixHandler]` dispatch, `FixGateway`, and the `keel fix:run` engine. Example: `examples/fix-gateway`.
 - Documentation site (MkDocs Material, deployed to GitHub Pages) with a tutorial; `keel new` projects
-  install `keel/framework` from GitHub; `TestResponse::assertJsonCount()`.
+  install Keel from GitHub; `TestResponse::assertJsonCount()`.
 - Prepared statements are cached per connection.
 - `app.key` with HKDF-derived keys per purpose; production refuses to boot without it.
 
@@ -59,6 +59,9 @@ Toward phase 2, "Work", plus security and SaaS features.
 - The HTTP client test no longer depends on `php -S` worker processes, which made it fail on some CI hosts.
 
 ### Breaking
+
+- The Composer package is now `el-hendawy/keel` (the `keel` vendor on Packagist belongs to someone else).
+  Replace `keel/framework` in your `composer.json`; the `Keel\` namespace is unchanged.
 
 - `IdempotencyMiddleware` is now scoped (it records the route), and `StoredResponse` has a `route` field.
   Custom idempotency stores keep working; entries stored by 0.1 replay without a route.

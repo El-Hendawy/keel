@@ -15,7 +15,7 @@ The two leaders earned their place. Laravel proved that developer happiness wins
 
 We are not here to clone them with fewer features. We are here to start from 2026 assumptions and make the right way the easy way.
 
-**[added] The name.** The framework is called **Keel**: the structural spine of a ship, laid first, that keeps it steady and on course for decades. Package `keel/framework`, namespace `Keel\`, command `keel`.
+**[added] The name.** The framework is called **Keel**: the structural spine of a ship, laid first, that keeps it steady and on course for decades. Package `el-hendawy/keel`, namespace `Keel\`, command `keel`.
 
 ## Positioning
 

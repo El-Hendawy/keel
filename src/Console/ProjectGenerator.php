@@ -33,9 +33,9 @@ final class ProjectGenerator
         $composer = [
             'name' => "app/$package",
             'type' => 'project',
-            // Keel is not on Packagist yet: install it from its repository.
+            // The repository is listed so projects install before the first tagged release reaches Packagist.
             'repositories' => [['type' => 'vcs', 'url' => 'https://github.com/El-Hendawy/keel']],
-            'require' => ['php' => '>=8.3', 'keel/framework' => 'dev-main'],
+            'require' => ['php' => '>=8.3', 'el-hendawy/keel' => '^0.2@dev'],
             'require-dev' => ['phpstan/phpstan' => '^2.0', 'phpunit/phpunit' => '^11.0'],
             'autoload' => ['psr-4' => ["$namespace\\" => 'src/']],
             'autoload-dev' => ['psr-4' => ["$namespace\\Tests\\" => 'tests/']],

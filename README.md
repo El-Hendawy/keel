@@ -84,14 +84,16 @@ application **and the generated code**.
 
 ## Quick start
 
-Keel is not on Packagist yet. From a checkout of this repository:
+Keel is published on Packagist as [`el-hendawy/keel`](https://packagist.org/packages/el-hendawy/keel)
+(namespace `Keel\`). To scaffold a new project, use the `keel` command from a checkout:
 
 ```bash
-composer install
+git clone https://github.com/El-Hendawy/keel.git && cd keel && composer install
 bin/keel new ../acme        # scaffolds an app with a worker entry point, a typed endpoint, a test and AGENTS.md
+cd ../acme && composer install
 ```
 
-Then, in the new project (once `keel/framework` resolves, e.g. through a Composer `path` repository):
+Or add it to an existing project with `composer require el-hendawy/keel:^0.2@dev`. Then:
 
 ```bash
 vendor/bin/keel serve       # http://127.0.0.1:8000/hello/world

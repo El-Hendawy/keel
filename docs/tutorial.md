@@ -17,7 +17,7 @@ bin/keel new ../notes
 cd ../notes && composer install
 ```
 
-The new project installs `keel/framework` from GitHub and contains:
+The new project requires `el-hendawy/keel` and contains:
 
 | File | Purpose |
 | --- | --- |
