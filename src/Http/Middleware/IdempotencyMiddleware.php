@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Keel\Http\Middleware;
 
 use Keel\Container\Attribute\Config;
-use Keel\Container\Attribute\Singleton;
+use Keel\Container\Attribute\Scoped;
 use Keel\Http\Exception\BadRequest;
 use Keel\Http\Exception\Conflict;
 use Keel\Http\Exception\UnprocessableEntity;
 use Keel\Http\Idempotency\IdempotencyStore;
 use Keel\Http\Idempotency\StoredResponse;
+use Keel\Http\RequestContext;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -24,11 +25,12 @@ use Psr\Http\Server\RequestHandlerInterface;
  * A retry while the first is still running gets 409; the same key with a different
  * payload gets 422. Server errors are not stored, so the client can retry them.
  */
-#[Singleton]
+#[Scoped]
 final readonly class IdempotencyMiddleware implements MiddlewareInterface
 {
     public function __construct(
         private IdempotencyStore $store,
+        private RequestContext $context,
         #[Config('idempotency.ttl_seconds')] private int $ttl = 86_400,
     ) {
     }
@@ -61,6 +63,9 @@ final readonly class IdempotencyMiddleware implements MiddlewareInterface
                 throw new Conflict('A request with this Idempotency-Key is still being processed.');
             }
 
+            // Routing does not run on a replay; report it under the route that produced it.
+            $this->context->route ??= $existing->response->route;
+
             return $existing->response->toResponse()->withHeader('Idempotent-Replayed', 'true');
         }
 
@@ -74,7 +79,7 @@ final readonly class IdempotencyMiddleware implements MiddlewareInterface
         if ($response->getStatusCode() >= 500) {
             $this->store->release($storeKey);
         } else {
-            $this->store->complete($storeKey, $fingerprint, StoredResponse::from($response), $this->ttl);
+            $this->store->complete($storeKey, $fingerprint, StoredResponse::from($response, $this->context->route), $this->ttl);
         }
 
         return $response;

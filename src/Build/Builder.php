@@ -58,6 +58,7 @@ final class Builder
         \Keel\Http\RateLimit\InMemoryRateLimitStore::class,
         \Keel\Http\Idempotency\InMemoryIdempotencyStore::class,
         \Keel\Events\EventDispatcher::class,
+        \Keel\Queue\JobRunner::class,
     ];
 
     public const array DEFAULT_BINDINGS = [
@@ -70,6 +71,9 @@ final class Builder
         \Keel\Http\RateLimit\RateLimitStore::class => \Keel\Http\RateLimit\InMemoryRateLimitStore::class,
         \Keel\Http\Idempotency\IdempotencyStore::class => \Keel\Http\Idempotency\InMemoryIdempotencyStore::class,
         \Psr\EventDispatcher\EventDispatcherInterface::class => \Keel\Events\EventDispatcher::class,
+        \Keel\Queue\Queue::class => \Keel\Queue\SyncQueue::class,
+        \Keel\Locks\LockStore::class => \Keel\Locks\InMemoryLockStore::class,
+        \Keel\Cache\Cache::class => \Keel\Cache\InMemoryCache::class,
     ];
 
     /** In tests, time, randomness, ids and outbound HTTP are fakes by contract. */
@@ -121,6 +125,11 @@ final class Builder
             $this->app->removedMiddleware(),
             $this->app->trustedProxies(),
             $this->app->hasOperationalEndpoints(),
+            $this->app->hasAuth(),
+            $this->app->hasTokenBinding(),
+            $this->app->frameworkMigrations(),
+            $this->app->hasQueue(),
+            $this->app->toonDefault(),
         ]);
 
         return hash('xxh128', implode("\n", $parts));
@@ -145,6 +154,10 @@ final class Builder
             }
         }
 
+        if ($this->app->hasQueue() && !$this->app->hasDatabase()) {
+            $this->errors[] = '->withQueue() stores jobs in the database. Add ->withDatabase() in app.php.';
+        }
+
         // 1. Services
         $analyzer = new ServiceAnalyzer();
         $this->synthetic(ServerRequestInterface::class, Lifetime::Scoped);
@@ -154,13 +167,21 @@ final class Builder
 
         $bindings = $this->app->bindingsFor($this->environment)
             + ($this->environment === 'test' ? self::TEST_BINDINGS : [])
+            + $this->featureBindings()
             + self::DEFAULT_BINDINGS;
         $middleware = array_values(array_filter(
-            [...self::DEFAULT_MIDDLEWARE, ...$this->app->extraMiddleware()],
+            [...$this->defaultMiddleware(), ...$this->app->extraMiddleware()],
             fn (string $class): bool => !\in_array($class, $this->app->removedMiddleware(), true),
         ));
 
+        $entities = array_values(array_filter($classes, static fn (string $c): bool => class_exists($c) && (new ReflectionClass($c))->getAttributes(\Keel\Orm\Attribute\Entity::class) !== []));
+        if ($entities !== [] && !$this->app->hasDatabase()) {
+            $this->errors[] = 'The application has #[Entity] classes. Add ->withDatabase() in app.php.';
+        }
+        $fixMessages = array_values(array_filter($classes, static fn (string $c): bool => class_exists($c) && (new ReflectionClass($c))->getAttributes(\Keel\Fix\Attribute\FixMessage::class) !== []));
         $candidates = array_unique([
+            ...($fixMessages === [] ? [] : [\Keel\Fix\FixGateway::class]),
+            ...($entities === [] ? [] : [\Keel\Orm\Orm::class, \Keel\Orm\EntityMap::class]),
             ...self::DEFAULT_SERVICES,
             ...$middleware,
             ...array_values($bindings),
@@ -170,6 +191,9 @@ final class Builder
 
         $modules = [];
         $listenerClasses = [];
+        $handlerClasses = [];
+        $fixHandlers = [];
+        $scheduled = [];
         $routeCandidates = [];
         foreach ($candidates as $class) {
             if (!class_exists($class)) {
@@ -187,9 +211,22 @@ final class Builder
             $lifetime = ServiceAnalyzer::declaredLifetime($reflection);
             $isListener = $reflection->getAttributes(Listener::class) !== [];
             $isEndpoint = $reflection->getAttributes(\Keel\Routing\Attribute\Route::class, \ReflectionAttribute::IS_INSTANCEOF) !== [];
+            $isHandler = $reflection->getAttributes(\Keel\Queue\Handler::class) !== [];
+            $isFixHandler = $reflection->getAttributes(\Keel\Fix\Attribute\FixHandler::class) !== [];
+            if ($isFixHandler) {
+                $fixHandlers[] = $class;
+            }
+            $schedule = $reflection->getAttributes(\Keel\Scheduling\Schedule::class)[0] ?? null;
             if ($isListener) {
                 $listenerClasses[] = $class;
             }
+            if ($isHandler) {
+                $handlerClasses[] = $class;
+            }
+            if ($schedule !== null) {
+                $scheduled[$class] = $schedule->newInstance()->cron;
+            }
+            $isListener = $isListener || $isHandler || $isFixHandler || $schedule !== null;
             if ($isEndpoint) {
                 $routeCandidates[] = $class;
             }
@@ -214,6 +251,27 @@ final class Builder
         }
         // A dependency whose class declares its own lifetime is a service wherever it lives
         // (framework, vendor or app). The class states its lifetime, so this is not guesswork.
+        // Endpoint parameters count as dependencies too.
+        foreach ($routeCandidates as $class) {
+            if (!method_exists($class, '__invoke')) {
+                continue;
+            }
+            foreach ((new \ReflectionMethod($class, '__invoke'))->getParameters() as $parameter) {
+                $type = $parameter->getType();
+                if (!$type instanceof \ReflectionNamedType || $type->isBuiltin()) {
+                    continue;
+                }
+                $name = $bindings[$type->getName()] ?? $type->getName();
+                if (isset($this->services[$name]) || !class_exists($name)) {
+                    continue;
+                }
+                $reflection = new ReflectionClass($name);
+                $lifetime = ServiceAnalyzer::declaredLifetime($reflection);
+                if ($lifetime !== null && ($dependency = $analyzer->fromClass($reflection, $lifetime)) !== null) {
+                    $this->services[$name] = $dependency;
+                }
+            }
+        }
         do {
             $added = false;
             foreach ($this->services as $definition) {
@@ -249,26 +307,92 @@ final class Builder
         $hydrators = new HydratorCompiler($types);
         $serializers = new SerializerCompiler($types);
         $isService = fn (string $type): bool => isset($this->services[$aliases[$type] ?? $type]);
-        $routes = new RouteCompiler($types, $hydrators, $serializers, $isService);
+        $routes = new RouteCompiler($types, $hydrators, $serializers, $isService, $this->app->hasAuth());
         foreach ($routeCandidates as $class) {
             $routes->add($class);
         }
         [$table, $conflicts] = $routes->table();
-        $hydratorCode = $hydrators->compile($namespace, 'Hydrators');
-        $serializerCode = $serializers->compile($namespace, 'Serializers');
-        $this->errors = [...$this->errors, ...$routes->errors, ...$conflicts, ...$types->errors];
 
-        // 3. Listeners
+        // 3. Listeners, job handlers and scheduled tasks
         $listeners = [];
-        foreach ($listenerClasses as $class) {
-            $invoke = (new ReflectionClass($class))->hasMethod('__invoke') ? new \ReflectionMethod($class, '__invoke') : null;
+        $asyncListeners = [];
+        $jobs = [];
+        $job = function (string $type, string $payload, string $handler, \Keel\Queue\Handler $options) use (&$jobs, $hydrators, $serializers): void {
+            if (!class_exists($payload) || (new ReflectionClass($payload))->isAbstract()) {
+                $this->errors[] = "$handler handles $payload, which must be a concrete, typed class to be queued.";
+
+                return;
+            }
+            /** @var class-string $payload */
+            $jobs[$type] = [
+                'class' => $payload,
+                'handler' => $handler,
+                'hydrator' => $hydrators->entry($payload),
+                'serializer' => $serializers->entry($payload),
+                'queue' => $options->queue,
+                'maxAttempts' => max(1, $options->maxAttempts),
+                'backoff' => max(1, $options->backoffSeconds),
+            ];
+        };
+        foreach ([...$listenerClasses, ...$handlerClasses] as $class) {
+            $reflection = new ReflectionClass($class);
+            $invoke = $reflection->hasMethod('__invoke') ? new \ReflectionMethod($class, '__invoke') : null;
             $type = $invoke?->getParameters()[0]?->getType();
             if ($invoke === null || $invoke->getNumberOfParameters() !== 1 || !$type instanceof \ReflectionNamedType || $type->isBuiltin()) {
-                $this->errors[] = "Listener $class must define __invoke(SomeEvent \$event) with exactly one class-typed parameter.";
+                $this->errors[] = "Listener or handler $class must define __invoke(SomeType \$value) with exactly one class-typed parameter.";
+                continue;
+            }
+            $handler = ($reflection->getAttributes(\Keel\Queue\Handler::class)[0] ?? null)?->newInstance();
+            if ($handler !== null) {
+                if (isset($jobs[$type->getName()])) {
+                    $this->errors[] = "Job {$type->getName()} has two handlers: {$jobs[$type->getName()]['handler']} and $class. A job has exactly one.";
+                }
+                $job($type->getName(), $type->getName(), $class, $handler);
+                continue;
+            }
+            $listener = ($reflection->getAttributes(Listener::class)[0] ?? null)?->newInstance();
+            if ($listener !== null && $listener->async) {
+                $job('listener:' . $class, $type->getName(), $class, new \Keel\Queue\Handler());
+                $asyncListeners[$type->getName()][] = 'listener:' . $class;
                 continue;
             }
             $listeners[$type->getName()][] = $class;
         }
+        $schedule = [];
+        foreach ($scheduled as $class => $cron) {
+            try {
+                \Keel\Scheduling\CronExpression::parse($cron);
+            } catch (\InvalidArgumentException $e) {
+                $this->errors[] = "#[Schedule] on $class: {$e->getMessage()}";
+                continue;
+            }
+            $invoke = (new ReflectionClass($class))->hasMethod('__invoke') ? new \ReflectionMethod($class, '__invoke') : null;
+            if ($invoke === null || $invoke->getNumberOfRequiredParameters() !== 0) {
+                $this->errors[] = "Scheduled task $class must define __invoke() without parameters; take dependencies in the constructor.";
+                continue;
+            }
+            $schedule[] = ['class' => $class, 'cron' => $cron];
+        }
+
+        $orm = new \Keel\Build\Orm\OrmCompiler();
+        foreach ($entities as $class) {
+            $orm->entity($class);
+        }
+        $orm->finish();
+        $this->errors = [...$this->errors, ...$orm->errors];
+
+        $fix = new \Keel\Build\Fix\FixCompiler();
+        foreach ($fixMessages as $class) {
+            $fix->message($class);
+        }
+        foreach ($fixHandlers as $class) {
+            $fix->handler($class);
+        }
+        $this->errors = [...$this->errors, ...$fix->errors];
+
+        $hydratorCode = $hydrators->compile($namespace, 'Hydrators');
+        $serializerCode = $serializers->compile($namespace, 'Serializers');
+        $this->errors = [...$this->errors, ...$routes->errors, ...$conflicts, ...$types->errors];
 
         // 4. Module boundaries
         $moduleChecker = new ModuleChecker($modules);
@@ -301,11 +425,17 @@ final class Builder
             'Serializers.php' => $serializerCode,
             'Endpoints.php' => $routes->compileEndpoints($namespace, 'Endpoints'),
         ];
+        if (!$fix->isEmpty()) {
+            $files['Fix.php'] = $fix->compileClass($namespace, 'Fix');
+        }
+        if (!$orm->isEmpty()) {
+            $files['Entities.php'] = $orm->compileClass($namespace, 'Entities');
+        }
         foreach ($files as $name => $code) {
             Php::write("$directory/$name", $code);
         }
 
-        $openApi = (new OpenApiGenerator($types))->generate($routeDefinitions, $this->app->name, $this->app->appVersion());
+        $openApi = (new OpenApiGenerator($types, $this->app->toonDefault() !== null))->generate($routeDefinitions, $this->app->name, $this->app->appVersion());
         Php::write("$directory/openapi.json", json_encode($openApi, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR) . "\n");
 
         $manifest = [
@@ -320,11 +450,25 @@ final class Builder
             'listeners' => $listeners,
             'middleware' => $middleware,
             'bindings' => $aliases,
-            'config' => ['http' => ['trusted_proxies' => $this->app->trustedProxies()], 'app' => ['name' => $this->app->name]],
-        ];
+            'config' => [
+                'http' => ['trusted_proxies' => $this->app->trustedProxies()]
+                    + ($this->app->toonDefault() === null ? [] : ['default_format' => $this->app->toonDefault()]),
+                'app' => ['name' => $this->app->name],
+                'auth' => ['binding' => $this->app->hasTokenBinding()],
+            ],
+            'migrations' => $this->app->frameworkMigrations(),
+            'hydrators' => $namespace . '\\Hydrators',
+            'serializers' => $namespace . '\\Serializers',
+            'jobs' => $jobs,
+            'asyncListeners' => $asyncListeners,
+            'schedule' => $schedule,
+        ] + ($fix->isEmpty() ? [] : ['fix' => $fix->manifest($namespace . '\\Fix')])
+          + ($orm->isEmpty() ? [] : ['orm' => $namespace . '\\Entities']);
         Php::write("$directory/manifest.php", "<?php\n\n// Generated by Keel. Do not edit.\n\nreturn " . Php::export($manifest) . ";\n");
 
         $metadata = $this->metadata($routeDefinitions, $containerCompiler, $moduleChecker, $listeners, $middleware, $aliases);
+        $metadata['jobs'] = array_map(static fn (array $j): array => ['payload' => $j['class'], 'handler' => $j['handler'], 'queue' => $j['queue'], 'maxAttempts' => $j['maxAttempts']], $jobs);
+        $metadata['schedule'] = $schedule;
         $metadata['buildMs'] = round((hrtime(true) - $started) / 1e6, 1);
         Php::write("$directory/metadata.json", json_encode($metadata, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR) . "\n");
 
@@ -332,6 +476,39 @@ final class Builder
         \assert($loaded !== null);
 
         return $loaded;
+    }
+
+    /** @return list<class-string<\Psr\Http\Server\MiddlewareInterface>> */
+    private function defaultMiddleware(): array
+    {
+        $middleware = [];
+        foreach (self::DEFAULT_MIDDLEWARE as $class) {
+            if ($class === \Keel\Http\Middleware\TelemetryMiddleware::class && $this->app->toonDefault() !== null) {
+                // Outside everything that can produce a response, so errors are negotiated too.
+                $middleware[] = \Keel\Http\Middleware\ContentNegotiationMiddleware::class;
+            }
+            if ($class === \Keel\Http\Middleware\IdempotencyMiddleware::class && $this->app->hasAuth()) {
+                // Authenticate before idempotency, so a replay is only served to the same caller.
+                $middleware[] = \Keel\Auth\AuthenticationMiddleware::class;
+            }
+            $middleware[] = $class;
+        }
+
+        return $middleware;
+    }
+
+    /** @return array<string, string> */
+    private function featureBindings(): array
+    {
+        $bindings = [];
+        if ($this->app->hasAuth()) {
+            $bindings[\Keel\Auth\Authenticator::class] = \Keel\Auth\BearerAuthenticator::class;
+            $bindings[\Keel\Auth\Token\TokenStore::class] = $this->app->hasDatabase()
+                ? \Keel\Auth\Token\DatabaseTokenStore::class
+                : \Keel\Auth\Token\InMemoryTokenStore::class;
+        }
+
+        return $bindings;
     }
 
     private function synthetic(string $id, Lifetime $lifetime): void
@@ -388,6 +565,7 @@ final class Builder
                 'output' => $r->output,
                 'status' => $r->status,
                 'summary' => $r->summary,
+                'auth' => $r->auth,
             ], $routes),
             'services' => $services,
             'bindings' => $aliases,

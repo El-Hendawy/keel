@@ -16,6 +16,7 @@ final class RouteDefinition
      * @param class-string|null $input
      * @param 'body'|'query'|null $inputSource
      * @param class-string|null $output
+     * @param array{anonymous: bool, scopes: list<string>, policy: ?string}|null $auth null when the app has no auth
      */
     public function __construct(
         public readonly string $method,
@@ -30,6 +31,7 @@ final class RouteDefinition
         public readonly ?string $output,
         public readonly bool $returnsResponse,
         public readonly ?string $summary,
+        public readonly ?array $auth = null,
         public string $handler = '',
         public ?string $module = null,
     ) {

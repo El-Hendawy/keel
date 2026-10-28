@@ -9,6 +9,10 @@ KEEL_ENV=prod vendor/bin/keel check --env=prod
 KEEL_ENV=prod vendor/bin/keel migrate
 ```
 
+Set `app.key` from a secret (e.g. `APP_KEY`), generated once with `keel key:generate`. It derives the keys
+for token fingerprints, signed cursors and Keel-issued JWTs. Rotating it invalidates cursors and Keel JWTs and
+forces re-binding of fingerprints, so rotate deliberately.
+
 In production the runtime never compiles: a missing build is a boot error.
 
 ## Run workers
@@ -43,9 +47,11 @@ worker finishes the request in flight, readiness starts failing, and the worker 
 A production worker refuses to start when:
 
 - debug is on (stack traces would leak);
-- rate limits or idempotency keys use in-memory stores (they would differ per node);
+- rate limits, idempotency keys or auth tokens use in-memory stores (they would differ per node);
+- the application has job handlers but no real queue, or scheduled tasks but no shared lock store;
 - `trustProxy()` trusts every address;
-- `/metrics` is enabled without `metrics.token`.
+- `/metrics` is enabled without `metrics.token`;
+- `app.key` is missing or shorter than 32 bytes.
 
 Use Redis-backed stores in production:
 
@@ -56,9 +62,23 @@ Use Redis-backed stores in production:
 
 with `redis.url` in config.
 
+## Background processes
+
+Run these next to the web workers, each as its own supervised process (systemd, a Kubernetes Deployment):
+
+```bash
+KEEL_ENV=prod vendor/bin/keel queue:work          # as many replicas as your job volume needs
+KEEL_ENV=prod vendor/bin/keel schedule:work       # one or more; each task still runs once per minute
+```
+
+Both stop cleanly on SIGTERM. `KEEL_MAX_REQUESTS` and `KEEL_MAX_MEMORY_MB` do not apply to them; restart
+workers on deploy so they load the new build.
+
 ## Behind a load balancer
 
 - `->trustProxy('10.0.0.0/8')` to accept `X-Forwarded-For` from your proxies only.
+- To add a TLS fingerprint to token binding, have the proxy that terminates TLS send the client's JA4 in
+  `X-JA4-Fingerprint` (Keel only reads it from trusted proxies). See [auth](auth.md#token-binding).
 - Send `X-Request-Start` from the proxy to enable queue-time load shedding
   (`load_shedding.max_queue_ms`, default 2000).
 - Send `X-Request-Id` and `traceparent` to correlate with edge logs and traces.

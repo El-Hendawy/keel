@@ -17,6 +17,7 @@ final class GetOrder
 | --- | --- |
 | Name matches a `{placeholder}` | The URL. `int` only matches digits; backed enums 404 on unknown values; `{id:[a-z]+}` sets a pattern |
 | Type is a registered service (or `ServerRequestInterface`) | The request scope |
+| `Principal` / `?Principal` | The authenticated caller (with `->withAuth()`; see [auth](auth.md)) |
 | Any other class | The input object: JSON body for POST/PUT/PATCH, query string for GET/HEAD/DELETE. Override with `#[Body]` or `#[Query]` |
 
 At most one input object per endpoint. Anything else is a build error.
@@ -76,6 +77,11 @@ Return an object; its public properties are the JSON. Arrays and nullable return
 time: return a list wrapper (`OrderList { /** @var list<OrderResource> */ public array $data }`) and throw
 `NotFound` instead of returning null. Return a `ResponseInterface` when you need full control (files, streams,
 custom content types); use `Keel\Http\Responses` to build one.
+
+## Lists
+
+Return a typed list output with a `PageInfo` member and paginate with signed cursors; see
+[cache and pagination](cache-and-pagination.md#cursor-pagination).
 
 ## Errors
 

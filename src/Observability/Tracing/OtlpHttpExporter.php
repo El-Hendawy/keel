@@ -72,6 +72,8 @@ final readonly class OtlpHttpExporter implements SpanExporter
             'kind' => match ($span->kind) {
                 Span::KIND_SERVER => 2,
                 Span::KIND_CLIENT => 3,
+                Span::KIND_PRODUCER => 4,
+                Span::KIND_CONSUMER => 5,
                 default => 1,
             },
             'startTimeUnixNano' => (string) $span->startNs,

@@ -9,15 +9,21 @@ use Keel\Http\Exception\PayloadTooLarge;
 use Keel\Http\Exception\UnsupportedMediaType;
 use Psr\Http\Message\ServerRequestInterface;
 
-/** Decodes request bodies for generated endpoints. JSON only, with size and depth limits. */
+/**
+ * Decodes request bodies for generated endpoints: JSON, with size and depth limits. A body
+ * already decoded by middleware (TOON) is used as is.
+ */
 final class RequestBody
 {
     public const int MAX_DEPTH = 64;
 
+    /** Request attribute set by middleware that has already decoded the body. */
+    public const string PRE_PARSED = 'keel.body_parsed';
+
     public static function decode(ServerRequestInterface $request, int $maxBytes = 1_048_576): mixed
     {
         $parsed = $request->getParsedBody();
-        if (\is_array($parsed) && $parsed !== []) {
+        if (\is_array($parsed) && ($parsed !== [] || $request->getAttribute(self::PRE_PARSED) === true)) {
             return $parsed;
         }
 

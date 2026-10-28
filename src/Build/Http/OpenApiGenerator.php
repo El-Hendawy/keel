@@ -19,7 +19,9 @@ final class OpenApiGenerator
     /** @var array<string, string> class => component name */
     private array $names = [];
 
-    public function __construct(private readonly TypeAnalyzer $types)
+    private bool $secured = false;
+
+    public function __construct(private readonly TypeAnalyzer $types, private readonly bool $toon = false)
     {
     }
 
@@ -62,12 +64,17 @@ final class OpenApiGenerator
         ];
         ksort($this->schemas);
 
+        $components = ['schemas' => $this->schemas];
+        if ($this->secured) {
+            $components['securitySchemes'] = ['bearer' => ['type' => 'http', 'scheme' => 'bearer', 'description' => 'A Keel token (keel_...) or a JWT.']];
+        }
+
         return [
             'openapi' => '3.1.0',
             'info' => ['title' => $title, 'version' => $version],
             'paths' => $paths,
-            'components' => ['schemas' => $this->schemas],
-        ];
+            'components' => $components,
+        ] + ($this->secured ? ['security' => [['bearer' => []]]] : []);
     }
 
     /** @return array<string, mixed> */
@@ -103,7 +110,7 @@ final class OpenApiGenerator
         if ($route->input !== null && $route->inputSource === 'body') {
             $operation['requestBody'] = [
                 'required' => true,
-                'content' => ['application/json' => ['schema' => $this->reference($route->input, true)]],
+                'content' => $this->content($this->reference($route->input, true)),
             ];
         }
 
@@ -111,24 +118,48 @@ final class OpenApiGenerator
         if ($route->output !== null) {
             $responses[(string) $route->status] = [
                 'description' => 'Success',
-                'content' => ['application/json' => ['schema' => $this->reference($route->output, false)]],
+                'content' => $this->content($this->reference($route->output, false)),
             ];
         } elseif ($route->returnsResponse) {
             $responses[(string) $route->status] = ['description' => 'Success'];
         } else {
             $responses[(string) $route->status] = ['description' => 'No content'];
         }
-        $problem = ['application/problem+json' => ['schema' => ['$ref' => '#/components/schemas/Problem']]];
+        $problem = ['application/problem+json' => ['schema' => ['$ref' => '#/components/schemas/Problem']]]
+            + ($this->toon ? [\Keel\Http\Toon\Toon::MEDIA_TYPE => ['schema' => ['$ref' => '#/components/schemas/Problem']]] : []);
         if ($route->input !== null) {
             $responses['422'] = ['description' => 'Validation failed', 'content' => $problem];
         }
         if ($route->pathParams !== []) {
             $responses['404'] = ['description' => 'Not found', 'content' => $problem];
         }
+        if ($route->auth !== null) {
+            $this->secured = true;
+            if ($route->auth['anonymous']) {
+                $operation['security'] = [];
+            } else {
+                $operation['security'] = [['bearer' => $route->auth['scopes']]];
+                $responses['401'] = ['description' => 'Not authenticated', 'content' => $problem];
+                if ($route->auth['scopes'] !== [] || $route->auth['policy'] !== null) {
+                    $responses['403'] = ['description' => 'Not allowed', 'content' => $problem];
+                }
+            }
+        }
         $responses['429'] = ['description' => 'Rate limited', 'content' => $problem];
         $operation['responses'] = $responses;
 
         return $operation;
+    }
+
+    /**
+     * The same schema as JSON and, with ->withToon(), as TOON (same data model, other syntax).
+     *
+     * @param array<string, mixed> $schema
+     * @return array<string, array{schema: array<string, mixed>}>
+     */
+    private function content(array $schema): array
+    {
+        return ['application/json' => ['schema' => $schema]] + ($this->toon ? [\Keel\Http\Toon\Toon::MEDIA_TYPE => ['schema' => $schema]] : []);
     }
 
     /**

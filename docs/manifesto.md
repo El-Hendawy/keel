@@ -140,7 +140,7 @@ Three rules hold everything together:
 
 We will ship a load-testing kit with the framework: reference scenarios, a profile mode for workers and a capacity report that shows requests per second, p95 latency and memory per worker on the team's own hardware.
 
-**[added] Where each level stands in v0.1.** Inside one process: done. Across nodes: the production check rejects in-memory rate-limit and idempotency stores; Redis stores ship. Data: read/write splitting, read-your-writes, statement timeouts and the result-size cap are done; tenant routing is roadmap. Background work: roadmap (phase 2). Traffic and failure: rate limiting, queue-time load shedding, timeouts, circuit breakers and bulkheads are done. The benchmark in `benchmarks/kernel.php` is the first piece of the load-testing kit.
+**[added] Where each level stands in v0.2.** Inside one process: done. Across nodes: the production check rejects in-memory rate-limit, idempotency, token and lock stores; Redis and database stores ship. Data: read/write splitting, read-your-writes, statement timeouts, the result-size cap and the tenant guard (with PostgreSQL row-level security) are done; tenant connection routing is roadmap. Background work: database queue with transactional outbox, retries and failed-job tooling, async listeners and a cluster-safe scheduler are done (v0.2); broker transports are roadmap. Traffic and failure: rate limiting, queue-time load shedding, timeouts, circuit breakers and bulkheads are done. The benchmark in `benchmarks/kernel.php` is the first piece of the load-testing kit.
 
 ## What the code looks like
 
@@ -258,8 +258,8 @@ We ship small and prove each layer in production before building the next. No ph
 | Phase | Scope |
 | --- | --- |
 | **1. Core**, v0.1 *(this release)* | Router, compiled container with lifetimes, typed I/O and OpenAPI, worker runtime (FrankenPHP, RoadRunner, FPM). Production defaults: tracing, metrics, logs, health, graceful shutdown, rate limiting, idempotency, load shedding. Fibers and `await_all`, non-blocking HTTP client, modules, SQL layer with N+1 detection, testing fakes, CLI. |
-| **2. Work**, v0.2 to v0.4 | Queues (retries, backoff, dead letters, idempotency keys), transactional outbox, scheduler, cache with declared ownership (tags, stampede protection), non-blocking database and Redis drivers under workers, Swoole adapter, typed entity mapping compiled at build time, online-safe migration checks, parallel test runner with isolated databases. |
-| **3. Scale**, v0.5 to v0.9 | Tenant-aware connection routing (database per tenant, shards), module transports (in-process, queue, remote) without code changes, generated client SDKs (TypeScript, PHP), load-testing kit and capacity report, Rector upgrade tooling, failure and migration recipes. |
+| **2. Work**, v0.2 to v0.4 | **Done in v0.2:** queues (retries, backoff, failed jobs), transactional outbox, async listeners, scheduler, cache with stampede protection, authentication with client-bound tokens, tenant guard, signed webhooks, cursor pagination, TypeScript SDK generation, tests on PostgreSQL and MySQL. **Next:** cache tags, job idempotency keys, non-blocking database and Redis drivers under workers, Swoole adapter, online-safe migration checks, parallel test runner. Also shipped in v0.2: typed entity mapping compiled at build time (the ORM), TOON, and a FIX engine. |
+| **3. Scale**, v0.5 to v0.9 | Tenant-aware connection routing (database per tenant, shards), module transports (in-process, queue, remote) without code changes, a PHP client SDK (TypeScript ships in v0.2), load-testing kit and capacity report, Rector upgrade tooling, failure and migration recipes. |
 | **4. Stable**, v1.0 | The promises above take effect: support windows, PHP policy, deprecation policy, LTS. |
 
 | Gate | Passed when |

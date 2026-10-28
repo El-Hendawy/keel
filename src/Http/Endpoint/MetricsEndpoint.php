@@ -9,11 +9,13 @@ use Keel\Http\Exception\NotFound;
 use Keel\Http\Exception\Unauthorized;
 use Keel\Http\Responses;
 use Keel\Observability\Metrics\Metrics;
+use Keel\Auth\Attribute\Anonymous;
 use Keel\Routing\Attribute\Get;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 /** Prometheus scrape endpoint. Protected by a bearer token when `metrics.token` is set. */
+#[Anonymous]
 #[Get('/metrics', name: 'keel.metrics')]
 final readonly class MetricsEndpoint
 {

@@ -30,8 +30,26 @@ final class Cli
           inspect           Print build metadata as JSON: routes, services, modules, config keys
           openapi           Print the OpenAPI document
           check             Run the production boot checks without serving traffic
-          migrate           Apply pending SQL migrations from ./migrations
+          migrate           Apply pending SQL migrations (framework features first, then ./migrations)
           serve             Start the development server (PHP built-in server)
+          sdk               Generate a TypeScript client from the OpenAPI document (--out=sdk/client.ts)
+
+          queue:work        Process background jobs (--queue=default,webhooks --once --max-jobs=N)
+          queue:failed      List failed jobs
+          queue:retry <id>  Retry a failed job, or `all`
+          schedule:run      Run the scheduled tasks due this minute (call from cron every minute)
+          schedule:work     Run the scheduler continuously
+
+          token:issue       Issue an API token: --principal=ID [--tenant=ID] [--scopes=a,b] [--ttl=0] [--name=..]
+          token:revoke <id> Revoke a token by id
+          key:generate      Print a new random app.key
+
+          orm:schema        Print CREATE TABLE statements for the #[Entity] classes (this database's dialect)
+          orm:diff          Print (or --write as a migration) what the database lacks for the entities
+          fix:run           Run the FIX engine: the sessions in config fix.sessions [--session=a,b]
+
+          make:endpoint <Name> --method=POST --path=/things [--scope=things:write]
+          make:migration <name>
 
         Options:
           --app=<file>      Application file (default: ./app.php)
@@ -58,6 +76,19 @@ final class Cli
                 'check' => self::check($appFile, $env),
                 'migrate' => self::migrate($appFile, $env, self::absolute($options['dir'] ?? 'migrations')),
                 'serve' => self::serve($appFile, $options),
+                'sdk' => self::sdk($appFile, $env, $options),
+                'queue:work' => self::queueWork($appFile, $env, $options),
+                'queue:failed' => self::queueFailed($appFile, $env),
+                'queue:retry' => self::queueRetry($appFile, $env, $arguments[0] ?? throw new \InvalidArgumentException('Usage: keel queue:retry <id|all>')),
+                'schedule:run' => self::scheduleRun($appFile, $env),
+                'schedule:work' => self::scheduleWork($appFile, $env),
+                'token:issue' => self::tokenIssue($appFile, $env, $options),
+                'token:revoke' => self::tokenRevoke($appFile, $env, $arguments[0] ?? throw new \InvalidArgumentException('Usage: keel token:revoke <token-id>')),
+                'fix:run' => self::fixRun($appFile, $env, $options),
+                'orm:schema', 'orm:diff' => self::ormSchema($appFile, $env, $command === 'orm:diff', $options),
+                'key:generate' => self::out('base64:' . base64_encode(random_bytes(32))),
+                'make:endpoint' => self::makeEndpoint($arguments[0] ?? null, $options),
+                'make:migration' => self::out("Created:\n  " . implode("\n  ", (new CodeGenerator((string) getcwd()))->migration($arguments[0] ?? throw new \InvalidArgumentException('Usage: keel make:migration <name>'), $options['dir'] ?? 'migrations'))),
                 'version', '--version', '-V' => self::out(Keel::VERSION),
                 default => self::out(\sprintf(self::HELP, Keel::VERSION), $command === null || \in_array($command, ['help', '--help', '-h'], true) ? 0 : 1),
             };
@@ -158,7 +189,7 @@ final class Cli
         if (!$app->container()->has(ConnectionManager::class)) {
             throw new \RuntimeException('The database layer is not enabled. Add ->withDatabase() in app.php.');
         }
-        $applied = (new Migrator($app->container()->get(ConnectionManager::class)->writer(), $directory))->migrate();
+        $applied = Migrator::forApplication($app, $directory)->migrate();
 
         return self::out($applied === [] ? 'Nothing to migrate.' : "Applied:\n  " . implode("\n  ", $applied));
     }
@@ -184,6 +215,197 @@ final class Cli
         passthru($command, $code);
 
         return $code;
+    }
+
+    /** @param array<string, string> $options */
+    private static function sdk(string $appFile, string $env, array $options): int
+    {
+        $app = Application::boot($appFile, ['env' => $env]);
+        $openApi = json_decode((string) file_get_contents($app->manifest->directory . '/openapi.json'), true, 512, \JSON_THROW_ON_ERROR);
+        \assert(\is_array($openApi));
+        /** @var array<string, mixed> $openApi */
+        $code = (new \Keel\Build\Sdk\TypeScriptGenerator())->generate($openApi);
+        $out = self::absolute($options['out'] ?? 'sdk/client.ts');
+        if (!is_dir(\dirname($out)) && !mkdir(\dirname($out), 0o775, true) && !is_dir(\dirname($out))) {
+            throw new \RuntimeException('Cannot create ' . \dirname($out));
+        }
+        file_put_contents($out, $code);
+
+        return self::out("Wrote $out");
+    }
+
+    /** @param array<string, string> $options */
+    private static function queueWork(string $appFile, string $env, array $options): int
+    {
+        $app = Application::boot($appFile, ['env' => $env]);
+        $queues = array_values(array_filter(explode(',', $options['queue'] ?? implode(',', self::queues($app)))));
+        $worker = new \Keel\Queue\QueueWorker($app->container(), (int) ($options['visibility'] ?? 300));
+        if (isset($options['once'])) {
+            return self::out(\sprintf('Processed %d job(s).', $worker->drain($queues)));
+        }
+        $policy = \Keel\Runtime\WorkerPolicy::fromEnvironment();
+        $policy->listenForSignals($worker->stop(...));
+        self::out('Processing ' . implode(', ', $queues) . ' (Ctrl+C or SIGTERM to stop after the current job).');
+        $processed = $worker->work($queues, (int) ($options['max-jobs'] ?? 0), (float) ($options['sleep'] ?? 1.0));
+        $app->shutdown();
+
+        return self::out("Stopped after $processed job(s).");
+    }
+
+    /** @return list<string> every queue a handler uses */
+    private static function queues(Application $app): array
+    {
+        $queues = array_values(array_unique(array_map(static fn (array $job): string => $job['queue'], $app->manifest->jobs())));
+
+        return $queues === [] ? ['default'] : $queues;
+    }
+
+    private static function queueFailed(string $appFile, string $env): int
+    {
+        $app = Application::boot($appFile, ['env' => $env]);
+        $failed = (new \Keel\Queue\FailedJobs($app->container()->get(ConnectionManager::class)->writer()))->list();
+        if ($failed === []) {
+            return self::out('No failed jobs.');
+        }
+        $lines = array_map(static fn (array $j): string => "{$j['id']}  {$j['type']}  attempts={$j['attempts']}  {$j['failed_at']}\n    {$j['last_error']}", $failed);
+
+        return self::out(implode("\n", $lines));
+    }
+
+    private static function queueRetry(string $appFile, string $env, string $id): int
+    {
+        $app = Application::boot($appFile, ['env' => $env]);
+        $count = (new \Keel\Queue\FailedJobs($app->container()->get(ConnectionManager::class)->writer()))->retry($id, time());
+
+        return self::out("Re-queued $count job(s).");
+    }
+
+    private static function scheduleRun(string $appFile, string $env): int
+    {
+        $app = Application::boot($appFile, ['env' => $env]);
+        $ran = (new \Keel\Scheduling\Scheduler($app->container()))->runDue(new \DateTimeImmutable());
+
+        return self::out($ran === [] ? 'No tasks due.' : "Ran:\n  " . implode("\n  ", $ran));
+    }
+
+    private static function scheduleWork(string $appFile, string $env): int
+    {
+        $app = Application::boot($appFile, ['env' => $env]);
+        $scheduler = new \Keel\Scheduling\Scheduler($app->container());
+        $policy = \Keel\Runtime\WorkerPolicy::fromEnvironment();
+        $policy->listenForSignals();
+        self::out('Scheduler running (Ctrl+C or SIGTERM to stop).');
+        while (!$policy->shouldStop(0)) {
+            $scheduler->runDue(new \DateTimeImmutable());
+            // Sleep to the start of the next minute; a signal interrupts the sleep.
+            sleep(max(1, (intdiv(time(), 60) + 1) * 60 - time()));
+        }
+        $app->shutdown();
+
+        return 0;
+    }
+
+    /** @param array<string, string> $options */
+    private static function tokenIssue(string $appFile, string $env, array $options): int
+    {
+        $app = Application::boot($appFile, ['env' => $env]);
+        $principal = $options['principal'] ?? throw new \InvalidArgumentException('Usage: keel token:issue --principal=ID [--tenant=ID] [--scopes=a,b] [--kind=api_key] [--ttl=0] [--name=..]');
+        $scopes = array_values(array_filter(array_map(trim(...), explode(',', $options['scopes'] ?? ''))));
+        $issued = $app->container()->get(\Keel\Auth\Token\Tokens::class)->issue(
+            $principal,
+            $options['tenant'] ?? null,
+            $scopes,
+            $options['kind'] ?? \Keel\Auth\Principal::API_KEY,
+            isset($options['ttl']) ? (int) $options['ttl'] : 0,
+            null,
+            $options['name'] ?? '',
+        );
+
+        return self::out(\sprintf(
+            "Token id: %s\nExpires: %s\nBound to: the first client that uses it\n\n%s\n\nShown once. Store it in a secret manager.",
+            $issued->id,
+            $issued->expiresAt === null ? 'never' : gmdate('Y-m-d H:i:s \U\T\C', $issued->expiresAt),
+            $issued->token,
+        ));
+    }
+
+    private static function tokenRevoke(string $appFile, string $env, string $id): int
+    {
+        $app = Application::boot($appFile, ['env' => $env]);
+        $app->container()->get(\Keel\Auth\Token\Tokens::class)->revoke($id);
+
+        return self::out("Revoked $id.");
+    }
+
+    /** @param array<string, string> $options */
+    private static function ormSchema(string $appFile, string $env, bool $diff, array $options): int
+    {
+        $app = Application::boot($appFile, ['env' => $env]);
+        $container = $app->container();
+        if (!$container->has(\Keel\Orm\EntityMap::class)) {
+            throw new \InvalidArgumentException('The application has no #[Entity] classes.');
+        }
+        $pdo = $container->get(ConnectionManager::class)->writer();
+        $driver = $pdo->getAttribute(\PDO::ATTR_DRIVER_NAME);
+        $override = $container->configuration()['database.dialect'] ?? '';
+        $schema = new \Keel\Orm\Schema($container->get(\Keel\Orm\EntityMap::class), \Keel\Orm\Dialect\Dialects::for(\is_string($driver) ? $driver : '', \is_string($override) ? $override : ''));
+        $statements = $diff ? $schema->diff($pdo) : $schema->create();
+        $sql = implode("\n", array_map(static fn (string $s): string => str_starts_with($s, '--') ? $s : "$s;", $statements));
+        if ($diff && isset($options['write'])) {
+            if ($statements === []) {
+                return self::out('The database matches the entities.');
+            }
+            $files = (new CodeGenerator(\dirname($appFile)))->migration('orm sync', $options['dir'] ?? 'migrations');
+            file_put_contents(\dirname($appFile) . '/' . $files[0], "-- Generated by `keel orm:diff`: review before applying.\n\n$sql\n");
+
+            return self::out("Wrote {$files[0]}");
+        }
+
+        return self::out($statements === [] ? '-- The database matches the entities.' : $sql);
+    }
+
+    /** @param array<string, string> $options */
+    private static function fixRun(string $appFile, string $env, array $options): int
+    {
+        $app = Application::boot($appFile, ['env' => $env]);
+        $config = $app->container()->configuration();
+        $sessions = $config['fix.sessions'] ?? [];
+        if (!\is_array($sessions) || $sessions === []) {
+            throw new \InvalidArgumentException('No FIX sessions configured. Add fix.sessions to config.php.');
+        }
+        $only = isset($options['session']) ? explode(',', $options['session']) : null;
+        $settings = [];
+        foreach ($sessions as $id => $session) {
+            if (\is_array($session) && ($only === null || \in_array((string) $id, $only, true))) {
+                $settings[] = \Keel\Fix\SessionSettings::fromConfig((string) $id, $session);
+            }
+        }
+        $store = $config['fix.store'] ?? $app->definition->rootDir . '/var/fix';
+        $host = $config['fix.listen_host'] ?? '127.0.0.1';
+        $engine = new \Keel\Fix\Engine(
+            $app->container(),
+            $settings,
+            \is_string($store) ? $store : null,
+            $app->container()->get(\Psr\Log\LoggerInterface::class),
+            \is_string($host) ? $host : '127.0.0.1',
+        );
+        \Keel\Runtime\WorkerPolicy::fromEnvironment()->listenForSignals($engine->stop(...));
+        self::out('FIX engine running ' . \count($settings) . ' session(s) (Ctrl+C or SIGTERM logs out and stops).');
+        $engine->run();
+        $app->shutdown();
+
+        return 0;
+    }
+
+    /** @param array<string, string> $options */
+    private static function makeEndpoint(?string $name, array $options): int
+    {
+        if ($name === null || !isset($options['path'])) {
+            throw new \InvalidArgumentException('Usage: keel make:endpoint Orders/CancelOrder --method=POST --path=/orders/{id}/cancel [--scope=orders:write]');
+        }
+        $files = (new CodeGenerator((string) getcwd()))->endpoint($name, $options['method'] ?? 'GET', $options['path'], $options['scope'] ?? null);
+
+        return self::out("Created:\n  " . implode("\n  ", $files));
     }
 
     /** @param array<string, string> $options */

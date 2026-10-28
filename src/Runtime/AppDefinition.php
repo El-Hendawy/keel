@@ -49,6 +49,20 @@ final class AppDefinition
 
     private string $version = '1.0.0';
 
+    private bool $database = false;
+
+    private bool $auth = false;
+
+    private bool $tokenBinding = true;
+
+    private bool $queue = false;
+
+    /** @var 'json'|'toon'|null the default format when TOON is enabled */
+    private ?string $toon = null;
+
+    /** @var list<string> framework migration directories enabled by features */
+    private array $migrations = [];
+
     private function __construct(public readonly string $rootDir, public readonly string $name)
     {
         $this->buildDir = $rootDir . '/var/build';
@@ -173,6 +187,8 @@ final class AppDefinition
     /** Registers the database layer: connection manager, scoped Database, query log and health check. */
     public function withDatabase(): self
     {
+        $this->database = true;
+
         return $this->register(
             \Keel\Database\ConnectionManager::class,
             \Keel\Database\Database::class,
@@ -181,18 +197,90 @@ final class AppDefinition
         );
     }
 
-    /** Uses Redis for rate limits and idempotency keys, so limits hold across nodes. */
+    /** Uses Redis for rate limits, idempotency keys, locks and the cache, so they hold across nodes. */
     public function withRedisStores(): self
     {
         return $this
             ->bind(\Keel\Http\RateLimit\RateLimitStore::class, \Keel\Http\RateLimit\RedisRateLimitStore::class)
-            ->bind(\Keel\Http\Idempotency\IdempotencyStore::class, \Keel\Http\Idempotency\RedisIdempotencyStore::class);
+            ->bind(\Keel\Http\Idempotency\IdempotencyStore::class, \Keel\Http\Idempotency\RedisIdempotencyStore::class)
+            ->bind(\Keel\Locks\LockStore::class, \Keel\Locks\RedisLockStore::class)
+            ->bind(\Keel\Cache\Cache::class, \Keel\Cache\RedisCache::class);
+    }
+
+    /**
+     * Background jobs in the application database (`keel_jobs`), processed by
+     * `keel queue:work`. Jobs pushed inside a transaction commit with it: a transactional
+     * outbox. Also stores scheduler locks in the database unless Redis stores are used.
+     * Requires ->withDatabase().
+     */
+    public function withQueue(): self
+    {
+        $this->queue = true;
+        $this->migrations[] = \dirname(__DIR__) . '/Queue/migrations';
+        $this->bindings[\Keel\Queue\Queue::class] = \Keel\Queue\DatabaseQueue::class;
+        $this->bindings[\Keel\Locks\LockStore::class] ??= \Keel\Locks\DatabaseLockStore::class;
+
+        return $this;
+    }
+
+    /**
+     * Signed outgoing webhooks (Standard Webhooks), delivered by the queue with retries
+     * and protected against requests to private networks. Use with ->withQueue().
+     */
+    public function withWebhooks(): self
+    {
+        return $this->register(\Keel\Webhooks\Webhooks::class, \Keel\Webhooks\DeliverWebhook::class);
     }
 
     /** Exports traces to an OpenTelemetry collector over OTLP/HTTP. */
     public function withOtlpTracing(): self
     {
         return $this->bind(\Keel\Observability\Tracing\SpanExporter::class, \Keel\Observability\Tracing\OtlpHttpExporter::class);
+    }
+
+    /**
+     * Authentication and authorization, deny by default: every endpoint requires a
+     * principal unless marked #[Anonymous]. Bearer tokens (`keel_...`, stored hashed in
+     * `keel_tokens` when the database is enabled) and JWTs are accepted, and tokens are
+     * bound to the client fingerprint they were issued to.
+     */
+    public function withAuth(): self
+    {
+        $this->auth = true;
+        $this->migrations[] = \dirname(__DIR__) . '/Auth/migrations';
+
+        return $this->register(
+            \Keel\Auth\AuthContext::class,
+            \Keel\Auth\AuthenticationMiddleware::class,
+            \Keel\Auth\BearerAuthenticator::class,
+            \Keel\Auth\Token\Tokens::class,
+            \Keel\Auth\Jwt\JwtTokens::class,
+            \Keel\Auth\Fingerprint\ClientFingerprint::class,
+        );
+    }
+
+    /**
+     * Unsafe by name: accepts bound tokens from any client. A stolen token then works
+     * from anywhere until it expires. Prefer `auth.fingerprint.mode = report` to observe
+     * before enforcing.
+     */
+    public function unsafeWithoutTokenBinding(): self
+    {
+        $this->tokenBinding = false;
+
+        return $this;
+    }
+
+    /**
+     * Lets clients use TOON (Token-Oriented Object Notation) instead of JSON: `Accept:
+     * text/toon` for responses, `Content-Type: text/toon` for bodies. With $default the API
+     * answers in TOON unless the client asks for JSON (`http.default_format` at runtime).
+     */
+    public function withToon(bool $default = false): self
+    {
+        $this->toon = $default ? 'toon' : 'json';
+
+        return $this;
     }
 
     public function withoutOperationalEndpoints(): self
@@ -258,6 +346,38 @@ final class AppDefinition
     public function hasOperationalEndpoints(): bool
     {
         return $this->operationalEndpoints;
+    }
+
+    public function hasDatabase(): bool
+    {
+        return $this->database;
+    }
+
+    public function hasAuth(): bool
+    {
+        return $this->auth;
+    }
+
+    /** @return 'json'|'toon'|null null when TOON is not enabled */
+    public function toonDefault(): ?string
+    {
+        return $this->toon;
+    }
+
+    public function hasQueue(): bool
+    {
+        return $this->queue;
+    }
+
+    public function hasTokenBinding(): bool
+    {
+        return $this->tokenBinding;
+    }
+
+    /** @return list<string> framework migration directories, applied before the application's own */
+    public function frameworkMigrations(): array
+    {
+        return array_values(array_unique($this->migrations));
     }
 
     public function appVersion(): string

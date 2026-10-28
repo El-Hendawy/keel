@@ -16,9 +16,12 @@ what depends on the request.
 3. **Validate the graph** (`ContainerCompiler`): missing services (with a suggested fix), cycles, and lifetime
    violations. A Singleton must not need a scope, directly or through Transients.
 4. **Routes and types** (`RouteCompiler`, `TypeAnalyzer`): each `__invoke` parameter is classified as a path
-   parameter, a service or *the* input object. Inputs and outputs are analysed recursively; an untyped array is
-   an error. Constraint attributes are checked against the field type.
-5. **Listeners and modules.** Listener maps are compiled. `ModuleChecker` verifies that every cross-module
+   parameter, a service, the `Principal` or *the* input object. Inputs and outputs are analysed recursively; an
+   untyped array is an error. Constraint attributes are checked against the field type. With auth enabled,
+   `#[Authorize]` scopes and policies (and deny-by-default) are compiled into each dispatch method.
+5. **Listeners, jobs, schedule and modules.** Listener maps are compiled; `#[Handler]` jobs and async
+   listeners get a hydrator and serializer for their payload, so jobs are encoded and validated by generated
+   code; `#[Schedule]` cron expressions are validated. `ModuleChecker` verifies that every cross-module
    reference targets an export of a declared dependency.
 6. **Write**, atomically (temp file and rename, so a running worker never reads half a file):
 
@@ -28,7 +31,7 @@ what depends on the request.
 | `Endpoints.php` | One static method per route: resolve services from the scope, hydrate input, invoke, serialize |
 | `Hydrators.php` | One method per input class: type checks, coercion (query only), constraints, unknown-field rejection, violation paths |
 | `Serializers.php` | One method per output class: public properties to arrays; enums and dates converted |
-| `manifest.php` | Route table (static map + combined regexes), listener map, middleware list, bindings, fingerprint |
+| `manifest.php` | Route table (static map + combined regexes), listener and async-listener maps, jobs, schedule, middleware list, bindings, framework migrations, fingerprint |
 | `openapi.json` | OpenAPI 3.1 from the same types |
 | `metadata.json` | Everything above as data, for `keel inspect`, tools and coding agents |
 
@@ -59,8 +62,10 @@ Runtime::run(app.php)
      HttpKernel::handle(request)
       ├─ scope = container->createScope()          ← everything request-specific lives here
       ├─ Pipeline (each middleware resolved from the scope)
-      │    RequestContext → Telemetry → LoadShedding → SecurityHeaders → RateLimit → BodyLimit → Idempotency → yours
+      │    RequestContext → Telemetry → LoadShedding → SecurityHeaders → RateLimit → BodyLimit
+      │      → Authentication (with ->withAuth()) → Idempotency → yours
       │    └─ RouteDispatcher: Router::match → Endpoints::rN(scope, request, params)
+      │                                         (auth guard, hydrate, invoke, serialize)
       ├─ errors → ErrorRenderer → problem+json (inside the pipeline, so telemetry sees the status)
       └─ finally: scope->dispose()                ← Disposable services closed, open transactions rolled back
      emit response
@@ -94,6 +99,12 @@ Structured concurrency rules:
 - If the caller is cancelled, its children are cancelled.
 
 Spans started inside a task nest under the span that was active when the task started.
+
+### Background work
+
+Queue workers and the scheduler boot the same build as the web workers and open one scope per job or task,
+exactly like a request. A job's tenant and trace context travel with it. See
+[background work](guide/background-work.md).
 
 ### Why the hot path is fast
 

@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Keel\Tests\Http;
 
 use Keel\Container\Scope;
-use Keel\Database\ConnectionManager;
 use Keel\Database\Database;
-use Keel\Database\Migrator;
 use Keel\Database\NPlusOneDetected;
 use Keel\Testing\TestApp;
 use PHPUnit\Framework\TestCase;
@@ -16,21 +14,25 @@ use PHPUnit\Framework\TestCase;
 final class ShopTest extends TestCase
 {
     private const string ROOT = __DIR__ . '/../../examples/shop';
-    private const array TENANT = ['X-Tenant-Id' => '11111111-1111-4111-8111-111111111111'];
+    private const string TENANT_ID = '11111111-1111-4111-8111-111111111111';
     private const string MERCHANT = '22222222-2222-4222-8222-222222222222';
 
     private TestApp $app;
 
+    /** @var array<string, string> Authorization header of a tenant user with every orders/invoices scope */
+    private array $user;
+
     protected function setUp(): void
     {
         $this->app = self::boot();
+        $this->user = $this->app->tokenFor('user-1', self::TENANT_ID, ['orders:*', 'invoices:read']);
     }
 
     /** @param array<string, mixed> $config */
     private static function boot(array $config = []): TestApp
     {
-        $app = TestApp::boot(self::ROOT . '/app.php', array_replace_recursive(['database' => ['dsn' => 'sqlite::memory:']], $config));
-        (new Migrator($app->container()->get(ConnectionManager::class)->writer(), self::ROOT . '/migrations'))->migrate();
+        $app = TestApp::boot(self::ROOT . '/app.php', array_replace_recursive(['database' => ['dsn' => \Keel\Testing\TestDatabase::dsn()]], $config));
+        $app->freshDatabase(self::ROOT . '/migrations');
 
         return $app;
     }
@@ -43,7 +45,7 @@ final class ShopTest extends TestCase
 
     public function testPlacingAnOrder(): void
     {
-        $response = $this->app->post('/orders', self::order(), self::TENANT)->assertStatus(201);
+        $response = $this->app->post('/orders', self::order(), $this->user)->assertStatus(201);
 
         $response
             ->assertJsonPath('status', 'placed')
@@ -53,15 +55,15 @@ final class ShopTest extends TestCase
 
         $id = $response->get('id');
         self::assertIsString($id);
-        $this->app->get("/orders/$id", self::TENANT)->assertStatus(200)->assertJsonPath('id', $id);
+        $this->app->get("/orders/$id", $this->user)->assertStatus(200)->assertJsonPath('id', $id);
     }
 
     public function testAnEventListenerInAnotherModuleCreatesTheInvoice(): void
     {
-        $id = $this->app->post('/orders', self::order(3), self::TENANT)->get('id');
+        $id = $this->app->post('/orders', self::order(3), $this->user)->get('id');
         self::assertIsString($id);
 
-        $this->app->get("/orders/$id/invoice", self::TENANT)
+        $this->app->get("/orders/$id/invoice", $this->user)
             ->assertStatus(200)
             ->assertJsonPath('orderId', $id)
             ->assertJsonPath('amountCents', 1350);
@@ -69,7 +71,7 @@ final class ShopTest extends TestCase
 
     public function testValidationReportsEveryProblemWithItsPath(): void
     {
-        $response = $this->app->post('/orders', ['merchantID' => 'nope', 'items' => [['sku' => '', 'quantity' => 0, 'unitPriceCents' => 'free']]], self::TENANT)
+        $response = $this->app->post('/orders', ['merchantID' => 'nope', 'items' => [['sku' => '', 'quantity' => 0, 'unitPriceCents' => 'free']]], $this->user)
             ->assertStatus(422);
 
         $errors = array_map(static fn (array $e): string => $e['path'] . ':' . $e['code'], $response->json()['errors']);
@@ -84,63 +86,65 @@ final class ShopTest extends TestCase
 
     public function testEmptyItemsAndBadJson(): void
     {
-        $this->app->post('/orders', ['merchantId' => self::MERCHANT, 'items' => []], self::TENANT)
+        $this->app->post('/orders', ['merchantId' => self::MERCHANT, 'items' => []], $this->user)
             ->assertStatus(422)
             ->assertJsonPath('errors.0.code', 'count');
 
-        $this->app->request('POST', '/orders', '{"merchantId": ', self::TENANT + ['Content-Type' => 'application/json'])
+        $this->app->request('POST', '/orders', '{"merchantId": ', $this->user + ['Content-Type' => 'application/json'])
             ->assertStatus(400);
     }
 
     public function testQueryInputsAreCoercedAndValidated(): void
     {
-        $this->app->post('/orders', self::order(), self::TENANT);
-        $this->app->post('/orders', self::order(), self::TENANT);
+        $this->app->post('/orders', self::order(), $this->user);
+        $this->app->post('/orders', self::order(), $this->user);
 
-        $this->app->get('/orders?limit=1&status=placed', self::TENANT)->assertStatus(200)->assertJsonPath('data.0.status', 'placed');
-        self::assertCount(1, $this->app->get('/orders?limit=1', self::TENANT)->get('data'));
-        $this->app->get('/orders?limit=0', self::TENANT)->assertStatus(422)->assertJsonPath('errors.0.path', 'limit');
-        $this->app->get('/orders?status=shipped', self::TENANT)->assertStatus(422)->assertJsonPath('errors.0.code', 'enum');
+        $this->app->get('/orders?limit=1&status=placed', $this->user)->assertStatus(200)->assertJsonPath('data.0.status', 'placed');
+        self::assertCount(1, $this->app->get('/orders?limit=1', $this->user)->get('data'));
+        $this->app->get('/orders?limit=0', $this->user)->assertStatus(422)->assertJsonPath('errors.0.path', 'limit');
+        $this->app->get('/orders?status=shipped', $this->user)->assertStatus(422)->assertJsonPath('errors.0.code', 'enum');
     }
 
     public function testTenantsAreIsolated(): void
     {
-        $id = $this->app->post('/orders', self::order(), self::TENANT)->get('id');
+        $id = $this->app->post('/orders', self::order(), $this->user)->get('id');
         self::assertIsString($id);
-        $this->app->get("/orders/$id", ['X-Tenant-Id' => '99999999-9999-4999-8999-999999999999'])->assertStatus(404);
-        $this->app->get("/orders/$id")->assertStatus(400);
+        $otherTenant = $this->app->tokenFor('user-2', '99999999-9999-4999-8999-999999999999', ['orders:read']);
+        $this->app->get("/orders/$id", $otherTenant)->assertStatus(404);
+        $this->app->get("/orders/$id")->assertStatus(401);
     }
 
     public function testConcurrentLookupWithAFakedExternalApi(): void
     {
-        $id = $this->app->post('/orders', self::order(), self::TENANT)->get('id');
+        $id = $this->app->post('/orders', self::order(), $this->user)->get('id');
         $this->app->http()->stub('GET', 'https://api.frankfurter.app/latest?from=EUR&to=USD', ['rates' => ['USD' => 1.1]]);
 
-        $this->app->get("/orders/$id/summary?currency=USD", self::TENANT)
+        $this->app->get("/orders/$id/summary?currency=USD", $this->user)
             ->assertStatus(200)
             ->assertJsonPath('rate', 1.1)
             ->assertJsonPath('convertedTotalCents', 990);
         self::assertCount(1, $this->app->http()->sent());
 
-        $this->app->get("/orders/$id/summary?currency=usd", self::TENANT)->assertStatus(422);
+        $this->app->get("/orders/$id/summary?currency=usd", $this->user)->assertStatus(422);
     }
 
     public function testUnexpectedOutboundCallsFailLoudly(): void
     {
         $app = self::boot(['log' => ['stream' => 'php://memory']]); // the 500 is expected; keep the output clean
-        $id = $app->post('/orders', self::order(), self::TENANT)->get('id');
-        $response = $app->get("/orders/$id/summary?currency=GBP", self::TENANT)->assertStatus(500);
+        $user = $app->tokenFor('user-1', self::TENANT_ID);
+        $id = $app->post('/orders', self::order(), $user)->get('id');
+        $response = $app->get("/orders/$id/summary?currency=GBP", $user)->assertStatus(500);
         self::assertStringContainsString('Unexpected outbound request in a test', (string) $response->get('exception.message'));
     }
 
     public function testIdempotencyKeysReplayTheFirstResponse(): void
     {
-        $headers = self::TENANT + ['Idempotency-Key' => 'order-123'];
+        $headers = $this->user + ['Idempotency-Key' => 'order-123'];
         $first = $this->app->post('/orders', self::order(), $headers)->assertStatus(201);
         $second = $this->app->post('/orders', self::order(), $headers)->assertStatus(201)->assertHeader('Idempotent-Replayed', 'true');
 
         self::assertSame($first->get('id'), $second->get('id'));
-        self::assertCount(1, $this->app->get('/orders', self::TENANT)->get('data'));
+        self::assertCount(1, $this->app->get('/orders', $this->user)->get('data'));
 
         $this->app->post('/orders', self::order(5), $headers)->assertStatus(422);
     }
@@ -148,9 +152,10 @@ final class ShopTest extends TestCase
     public function testRateLimitingIsOnByDefault(): void
     {
         $app = self::boot(['rate_limit' => ['capacity' => 2, 'per_seconds' => 60]]);
-        $app->get('/orders', self::TENANT)->assertStatus(200)->assertHeader('RateLimit-Remaining', '1');
-        $app->get('/orders', self::TENANT)->assertStatus(200);
-        $app->get('/orders', self::TENANT)->assertStatus(429)->assertHeader('Retry-After');
+        $user = $app->tokenFor('user-1', self::TENANT_ID);
+        $app->get('/orders', $user)->assertStatus(200)->assertHeader('RateLimit-Remaining', '1');
+        $app->get('/orders', $user)->assertStatus(200);
+        $app->get('/orders', $user)->assertStatus(429)->assertHeader('Retry-After');
         $app->get('/health/live')->assertStatus(200);
     }
 
@@ -171,7 +176,7 @@ final class ShopTest extends TestCase
 
     public function testRedMetricsAreRecordedPerRoute(): void
     {
-        $this->app->post('/orders', self::order(), self::TENANT);
+        $this->app->post('/orders', self::order(), $this->user);
         $metrics = $this->app->get('/metrics')->assertStatus(200)->body();
 
         self::assertStringContainsString('http_requests_total{method="POST",route="/orders",status="201",worker=', $metrics);
@@ -191,7 +196,7 @@ final class ShopTest extends TestCase
         $this->app->inScope(static function (Scope $scope): void {
             $db = $scope->get(Database::class);
             for ($i = 0; $i < 11; $i++) {
-                $db->select('SELECT * FROM orders WHERE id = ?', ["order-$i"]);
+                $db->select('SELECT * FROM order_items WHERE order_id = ?', ["order-$i"]);
             }
         });
     }

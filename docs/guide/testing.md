@@ -3,9 +3,11 @@
 ```php
 use Keel\Testing\TestApp;
 
-$app = TestApp::boot(__DIR__ . '/../app.php', ['database' => ['dsn' => 'sqlite::memory:']]);
+$app = TestApp::boot(__DIR__ . '/../app.php', ['database' => ['dsn' => TestDatabase::dsn()]]);
+$app->freshDatabase(__DIR__ . '/../migrations');
 
-$app->post('/orders', ['merchantId' => $merchant, 'items' => [...]], ['X-Tenant-Id' => $tenant])
+$user = $app->tokenFor('ada', $tenantId, ['orders:*']);   // a real token, bound on first use
+$app->post('/orders', ['merchantId' => $merchant, 'items' => [...]], $user)
     ->assertStatus(201)
     ->assertJsonPath('items.0.sku', 'TEA-1');
 ```
@@ -34,16 +36,33 @@ $app->container()->override(PaymentGateway::class, new FakeGateway());
 
 or bind per environment in `app.php`: `->bindIn('test', PaymentGateway::class, FakeGateway::class)`.
 
-## Jobs and commands
+## Authentication
+
+`tokenFor($principalId, $tenantId, $scopes)` issues a real token through the application's token store and
+returns the `Authorization` header. Test requests send `User-Agent: KeelTestApp/1.0`, so the token binds to
+the test client on first use, as in production; send another `User-Agent` to test a stolen token.
+
+## Jobs, scheduled tasks and commands
 
 ```php
+$app->runJobs();                                                   // everything ready in the queue
+$app->runSchedule(new DateTimeImmutable('2026-01-02T03:00:00Z'));  // tasks due at that minute
 $app->inScope(function (Scope $scope) {
     $scope->get(Orders::class)->expireAbandoned();
 });
 ```
 
+Jobs see the frozen clock: `$app->clock()->advance('+1 hour')` moves retries and delays along.
+
 ## Databases
 
-`sqlite::memory:` gives each booted app its own database. For a real engine in parallel runs, derive the
-database name from the worker token (`getenv('TEST_TOKEN')` under paratest) in `config.php`. N+1 queries throw
-in tests.
+`TestDatabase::dsn()` is an in-memory SQLite database unless `KEEL_TEST_DATABASE_DSN` is set, so the same
+tests run on PostgreSQL and MySQL in CI:
+
+```bash
+KEEL_TEST_DATABASE_DSN='pgsql:host=127.0.0.1;dbname=app_test;user=app' vendor/bin/phpunit
+```
+
+`freshDatabase()` drops every table and migrates (framework migrations first), so each test starts clean.
+For parallel runs, put `{token}` in the DSN (`dbname=app_test_{token}`); it is replaced by paratest's
+`TEST_TOKEN`. N+1 queries and tenant violations throw in tests.

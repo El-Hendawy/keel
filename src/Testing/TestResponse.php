@@ -28,10 +28,16 @@ final readonly class TestResponse
         return $body->getContents();
     }
 
-    /** @return array<mixed> */
+    /**
+     * The decoded body, from JSON or TOON depending on the response's Content-Type.
+     *
+     * @return array<mixed>
+     */
     public function json(): array
     {
-        $decoded = json_decode($this->body(), true, 512, \JSON_THROW_ON_ERROR);
+        $decoded = str_starts_with($this->header('Content-Type'), \Keel\Http\Toon\Toon::MEDIA_TYPE)
+            ? \Keel\Http\Toon\Toon::decode($this->body())
+            : json_decode($this->body(), true, 512, \JSON_THROW_ON_ERROR);
 
         return \is_array($decoded) ? $decoded : [];
     }

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Shop\Orders;
 
 use Keel\Http\Exception\NotFound;
+use Keel\Auth\Attribute\Authorize;
 use Keel\Routing\Attribute\Get;
 
 use function Keel\Async\await_all;
 
 /** Order total converted to another currency; the lookup and the FX call run concurrently. */
 #[Get('/orders/{id}/summary', name: 'orders.summary')]
+#[Authorize(scopes: ['orders:read'])]
 final class GetOrderSummary
 {
     public function __invoke(string $id, SummaryQuery $query, Orders $orders, FxRates $fx): OrderSummary

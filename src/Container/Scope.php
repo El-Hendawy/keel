@@ -32,6 +32,12 @@ final class Scope
         return $this->container->resolve($id, $this);
     }
 
+    /** The container this scope belongs to, for code that opens scopes of its own (jobs, tasks). */
+    public function container(): Container
+    {
+        return $this->container;
+    }
+
     /** Provides a synthetic scoped service, such as the current request. */
     public function set(string $id, object $instance): void
     {

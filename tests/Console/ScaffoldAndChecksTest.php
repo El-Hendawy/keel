@@ -35,10 +35,11 @@ final class ScaffoldAndChecksTest extends TestCase
         $app = Application::boot(__DIR__ . '/../Fixtures/Contracts/app.php', ['env' => 'prod-like', 'debug' => true]);
         $problems = ProductionChecks::problems($app);
 
-        self::assertCount(4, $problems);
+        self::assertCount(5, $problems);
         self::assertStringContainsString('Debug is on in production', $problems[0]);
         self::assertStringContainsString('InMemoryRateLimitStore', implode("\n", $problems));
         self::assertStringContainsString('/metrics endpoint is public', implode("\n", $problems));
+        self::assertStringContainsString('app.key is missing', implode("\n", $problems));
     }
 
     public function testProductionNeverBuildsOnTheFly(): void

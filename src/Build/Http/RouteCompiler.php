@@ -9,6 +9,10 @@ use Keel\Build\Types\HydratorCompiler;
 use Keel\Build\Types\SerializerCompiler;
 use Keel\Build\Types\TypeAnalyzer;
 use Keel\Build\Types\TypeInfo;
+use Keel\Auth\Attribute\Anonymous;
+use Keel\Auth\Attribute\Authorize;
+use Keel\Auth\Policy;
+use Keel\Auth\Principal;
 use Keel\Routing\Attribute\Body;
 use Keel\Routing\Attribute\Query;
 use Keel\Routing\Attribute\Route;
@@ -24,8 +28,12 @@ use ReflectionNamedType;
  * Each `__invoke` parameter is classified once, at build time:
  *  - its name matches a path parameter     -> taken from the URL, coerced to its type
  *  - its type is a registered service      -> resolved from the request scope
+ *  - its type is Principal (or ?Principal)  -> the authenticated caller
  *  - its type is any other class           -> the typed input, hydrated from body or query
  * Anything else is a build error, so a route that compiles can always be called.
+ *
+ * With auth enabled, every route requires a principal unless marked #[Anonymous], and
+ * #[Authorize] scopes and policies are compiled into the dispatch method.
  */
 final class RouteCompiler
 {
@@ -46,6 +54,7 @@ final class RouteCompiler
         private readonly HydratorCompiler $hydrators,
         private readonly SerializerCompiler $serializers,
         private $isService,
+        private readonly bool $auth = false,
     ) {
     }
 
@@ -98,6 +107,16 @@ final class RouteCompiler
             $explicitPatterns[$placeholder[1]] = $placeholder[2] ?? null;
         }
 
+        $auth = $this->authOf($class, $where);
+        $guard = '';
+        if ($auth !== null && !$auth['anonymous']) {
+            $guard = '$principal = $scope->get(\\Keel\\Auth\\AuthContext::class)->require(' . Php::export($auth['scopes']) . ");\n        ";
+            if ($auth['policy'] !== null) {
+                $guard .= 'if (!$scope->get(\\' . $auth['policy'] . '::class)->allows($principal, $request, $params)) {' . "\n"
+                    . "            throw new \\Keel\\Http\\Exception\\Forbidden('You are not allowed to perform this action.');\n        }\n        ";
+            }
+        }
+
         $invoke = $class->getMethod('__invoke');
         $pathParams = [];
         $patterns = [];
@@ -131,6 +150,15 @@ final class RouteCompiler
             }
 
             $typeName = $type->getName();
+            if ($typeName === Principal::class) {
+                if ($auth === null) {
+                    $this->errors[] = "$at: endpoints can only receive a Principal when authentication is enabled. Call ->withAuth() in app.php.";
+                } elseif ($auth['anonymous'] && !$type->allowsNull()) {
+                    $this->errors[] = "$at: {$class->getName()} is #[Anonymous], so the caller may not be authenticated. Declare the parameter as ?Principal.";
+                }
+                $arguments[] = '$scope->get(\\Keel\\Auth\\AuthContext::class)->' . ($type->allowsNull() ? 'user()' : 'principal()');
+                continue;
+            }
             if ($typeName === ServerRequestInterface::class || ($this->isService)($typeName)) {
                 $arguments[] = '$scope->get(\\' . $typeName . '::class)';
                 continue;
@@ -207,12 +235,48 @@ final class RouteCompiler
             $output,
             $returnsResponse,
             self::summary($class),
+            $auth,
         );
         $definition->handler = 'r' . \count($this->routes);
         $this->routes[] = $definition;
         $this->methods[] = "    /** @param array<string, string> \$params */\n"
             . "    public static function {$definition->handler}(Scope \$scope, ServerRequestInterface \$request, array \$params): ResponseInterface\n"
-            . "    {\n        $body\n    }\n";
+            . "    {\n        $guard$body\n    }\n";
+    }
+
+    /**
+     * @param ReflectionClass<object> $class
+     * @return array{anonymous: bool, scopes: list<string>, policy: ?string}|null
+     */
+    private function authOf(ReflectionClass $class, string $where): ?array
+    {
+        $anonymous = $class->getAttributes(Anonymous::class) !== [];
+        $attribute = $class->getAttributes(Authorize::class)[0] ?? null;
+        $authorize = $attribute?->newInstance();
+        if (!$this->auth) {
+            if ($authorize !== null) {
+                $this->errors[] = "$where uses #[Authorize], but authentication is not enabled. Call ->withAuth() in app.php.";
+            }
+
+            return null;
+        }
+        if ($anonymous && $authorize !== null) {
+            $this->errors[] = "$where is both #[Anonymous] and #[Authorize]. Pick one.";
+        }
+        $arguments = $attribute?->getArguments() ?? [];
+        $policy = $arguments['policy'] ?? $arguments[1] ?? null; // raw, so a wrong class is reported, not trusted
+        if ($policy !== null) {
+            if (!\is_string($policy) || !is_a($policy, Policy::class, true)) {
+                $policy = \is_string($policy) ? $policy : get_debug_type($policy);
+                $this->errors[] = "$where: policy $policy must implement " . Policy::class . '.';
+                $policy = null;
+            } elseif (!($this->isService)($policy)) {
+                $this->errors[] = "$where: policy $policy is not a service. Give it #[Singleton] or #[Scoped].";
+                $policy = null;
+            }
+        }
+
+        return ['anonymous' => $anonymous, 'scopes' => $authorize->scopes ?? [], 'policy' => $policy];
     }
 
     private function pathArgument(string $name, TypeInfo $info): string

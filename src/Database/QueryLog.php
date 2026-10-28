@@ -35,6 +35,9 @@ final class QueryLog
     {
         $this->total++;
         $this->totalMs += $durationMs;
+        if (preg_match('/^\s*(?:SELECT|WITH)\b/i', $sql) !== 1) {
+            return; // N+1 is a read problem; batched writes are counted in total() only
+        }
         $count = $this->counts[$sql] = ($this->counts[$sql] ?? 0) + 1;
 
         if ($count === $this->threshold + 1) {

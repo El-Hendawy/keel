@@ -1,6 +1,8 @@
 # Keel vs Laravel Octane: end-to-end benchmark
 
-Run on 2026-10-28. Both applications run under the **same FrankenPHP binary in worker mode, with 8 workers**,
+Run on 2026-10-28 with Keel 0.1.0-dev (the initial commit, `4f5f67a`), before authentication existed: neither application
+authenticated requests. To reproduce, check out that commit. Both applications run under the **same
+FrankenPHP binary in worker mode, with 8 workers**,
 and serve the same three endpoints against the same schema, first on SQLite, then on PostgreSQL.
 
 ## Results on SQLite

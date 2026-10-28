@@ -67,6 +67,8 @@ final class ProjectGenerator
 
                 /** @var Keel\Runtime\Environment $env */
                 return [
+                    // 32+ random bytes from a secret; `keel key:generate` prints one. Required in production.
+                    'app' => ['key' => getenv('APP_KEY') ?: ''],
                     'log' => ['level' => $env->isTest() ? 'warning' : 'info'],
                     'metrics' => ['token' => getenv('METRICS_TOKEN') ?: ''],
                 ];

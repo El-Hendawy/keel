@@ -8,10 +8,12 @@ use Keel\Container\Attribute\All;
 use Keel\Http\Responses;
 use Keel\Observability\Health\HealthCheck;
 use Keel\Observability\Health\WorkerState;
+use Keel\Auth\Attribute\Anonymous;
 use Keel\Routing\Attribute\Get;
 use Psr\Http\Message\ResponseInterface;
 
 /** Readiness probe: runs every registered HealthCheck. Returns 503 while draining or when a check fails. */
+#[Anonymous]
 #[Get('/health/ready', name: 'keel.health.ready')]
 final readonly class Readiness
 {

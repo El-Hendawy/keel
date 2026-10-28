@@ -67,12 +67,26 @@ final readonly class Orders
         return $row === null ? null : $this->hydrate([$row])[0];
     }
 
-    /** @return list<Order> */
-    public function latest(int $limit, ?OrderStatus $status): array
+    /**
+     * Newest first, continuing after $after (a decoded cursor) when given: keyset
+     * pagination, so deep pages cost the same as the first.
+     *
+     * @param array<string, scalar|null>|null $after
+     * @return list<Order>
+     */
+    public function latest(int $limit, ?OrderStatus $status, ?array $after = null): array
     {
+        $createdAt = (string) ($after['c'] ?? '9999');
+        $id = (string) ($after['i'] ?? '');
         $rows = $status === null
-            ? $this->db->select('SELECT * FROM orders WHERE tenant_id = ? ORDER BY created_at DESC, id DESC LIMIT ?', [$this->tenant->id, $limit])
-            : $this->db->select('SELECT * FROM orders WHERE tenant_id = ? AND status = ? ORDER BY created_at DESC, id DESC LIMIT ?', [$this->tenant->id, $status->value, $limit]);
+            ? $this->db->select(
+                'SELECT * FROM orders WHERE tenant_id = ? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT ?',
+                [$this->tenant->id, $createdAt, $createdAt, $after === null ? '~' : $id, $limit],
+            )
+            : $this->db->select(
+                'SELECT * FROM orders WHERE tenant_id = ? AND status = ? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT ?',
+                [$this->tenant->id, $status->value, $createdAt, $createdAt, $after === null ? '~' : $id, $limit],
+            );
 
         return $this->hydrate($rows);
     }

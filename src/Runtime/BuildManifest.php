@@ -22,7 +22,15 @@ namespace Keel\Runtime;
  *     listeners: array<string, list<class-string>>,
  *     middleware: list<class-string<\Psr\Http\Server\MiddlewareInterface>>,
  *     bindings: array<string, string>,
- *     config: array<string, mixed>
+ *     config: array<string, mixed>,
+ *     migrations?: list<string>,
+ *     hydrators?: class-string,
+ *     serializers?: class-string,
+ *     jobs?: array<string, array{class: class-string, handler: class-string, hydrator: string, serializer: string, queue: string, maxAttempts: int, backoff: int}>,
+ *     asyncListeners?: array<string, list<string>>,
+ *     schedule?: list<array{class: class-string, cron: string}>,
+ *     orm?: class-string,
+ *     fix?: array{messages: array<string, array{class: class-string, decoder: string, encoder: string}>, handlers: array<string, class-string>, classes: array<string, string>, codec: string}
  * }
  */
 final class BuildManifest
@@ -74,6 +82,52 @@ final class BuildManifest
         }
 
         return $this->resolvedListeners[$eventClass] = array_values(array_unique($listeners));
+    }
+
+    /**
+     * Job types (an async listener's type is "listener:<class>") for an event class.
+     *
+     * @return list<string>
+     */
+    public function asyncListenersFor(string $eventClass): array
+    {
+        return $this->data['asyncListeners'][$eventClass] ?? [];
+    }
+
+    /** @return array{class: class-string, handler: class-string, hydrator: string, serializer: string, queue: string, maxAttempts: int, backoff: int}|null */
+    public function job(string $type): ?array
+    {
+        return $this->data['jobs'][$type] ?? null;
+    }
+
+    /** @return array<string, array{class: class-string, handler: class-string, hydrator: string, serializer: string, queue: string, maxAttempts: int, backoff: int}> */
+    public function jobs(): array
+    {
+        return $this->data['jobs'] ?? [];
+    }
+
+    /** @return list<array{class: class-string, cron: string}> */
+    public function schedule(): array
+    {
+        return $this->data['schedule'] ?? [];
+    }
+
+    /** @return class-string */
+    public function hydrators(): string
+    {
+        return $this->data['hydrators'] ?? throw new \LogicException('This build has no hydrators. Rebuild with `keel build`.');
+    }
+
+    /** @return class-string */
+    public function serializers(): string
+    {
+        return $this->data['serializers'] ?? throw new \LogicException('This build has no serializers. Rebuild with `keel build`.');
+    }
+
+    /** @return list<string> framework migration directories enabled by the application's features */
+    public function migrations(): array
+    {
+        return $this->data['migrations'] ?? [];
     }
 
     /** @return array<string, string> */

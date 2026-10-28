@@ -22,11 +22,8 @@ final class HttpClientTest extends TestCase
     public static function setUpBeforeClass(): void
     {
         self::$port = random_int(20000, 40000);
-        $script = sys_get_temp_dir() . '/keel-slow-server.php';
-        file_put_contents($script, '<?php usleep(300000); header("Content-Type: application/json"); echo json_encode(["path" => $_SERVER["REQUEST_URI"]]);');
-        $command = [\PHP_BINARY, '-S', '127.0.0.1:' . self::$port, $script];
-        $env = ['PHP_CLI_SERVER_WORKERS' => '4'] + getenv();
-        self::$server = proc_open($command, [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, null, $env) ?: null;
+        $command = [\PHP_BINARY, __DIR__ . '/../Support/slow-server.php', (string) self::$port];
+        self::$server = proc_open($command, [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes) ?: null;
         for ($i = 0; $i < 50; $i++) {
             $socket = @fsockopen('127.0.0.1', self::$port);
             if ($socket !== false) {
@@ -42,9 +39,6 @@ final class HttpClientTest extends TestCase
     public static function tearDownAfterClass(): void
     {
         if (self::$server !== null) {
-            // The built-in server forks workers: stop them before the parent.
-            $pid = proc_get_status(self::$server)['pid'];
-            exec('pkill -9 -P ' . (int) $pid);
             proc_terminate(self::$server, 9);
             proc_close(self::$server);
         }

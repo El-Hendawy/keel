@@ -25,17 +25,57 @@ jobs:
       - name: Tests
         run: vendor/bin/phpunit
       - name: Static analysis (generated code)
-        run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress -c phpstan.neon.dist examples/shop/var/build/test
+        run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress -c phpstan.neon.dist examples/shop/var/build/test examples/fix-gateway/var/build/test
       - name: Production build and checks
         working-directory: examples/shop
         env:
           METRICS_TOKEN: ci
         run: |
           php ../../bin/keel build --env=prod
-          php ../../bin/keel check --env=prod
+          APP_KEY=$(php ../../bin/keel key:generate) php ../../bin/keel check --env=prod
       - name: Kernel benchmark
         run: php -d opcache.enable_cli=1 benchmarks/kernel.php | tee benchmark.txt
       - uses: actions/upload-artifact@v4
         with:
           name: benchmark-php${{ matrix.php }}
           path: benchmark.txt
+
+  databases:
+    # The database-backed tests (shop, auth, queue, tenancy) on real PostgreSQL and MySQL.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - db: postgres
+            dsn: 'pgsql:host=127.0.0.1;port=5432;dbname=keel_test;user=keel;password=keel'
+          - db: mysql
+            dsn: 'mysql:host=127.0.0.1;port=3306;dbname=keel_test;user=root;password=keel'
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: keel
+          POSTGRES_PASSWORD: keel
+          POSTGRES_DB: keel_test
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U keel" --health-interval 5s --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: keel
+          MYSQL_DATABASE: keel_test
+        ports: ['3306:3306']
+        options: --health-cmd "mysqladmin ping -pkeel" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: curl, mbstring, pdo_sqlite, pdo_pgsql, pdo_mysql, pcntl
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - name: Tests on ${{ matrix.db }}
+        env:
+          KEEL_TEST_DATABASE_DSN: ${{ matrix.dsn }}
+        run: vendor/bin/phpunit tests/Http tests/Auth tests/Queue tests/Orm

@@ -10,6 +10,8 @@ final class Span
     public const string KIND_INTERNAL = 'internal';
     public const string KIND_SERVER = 'server';
     public const string KIND_CLIENT = 'client';
+    public const string KIND_PRODUCER = 'producer';
+    public const string KIND_CONSUMER = 'consumer';
 
     public ?int $endNs = null;
     public bool $error = false;

@@ -3,6 +3,7 @@ parameters:
     paths:
         - src
         - examples/shop/src
+        - examples/fix-gateway/src
     # Symbols that only exist under FrankenPHP or with spiral/roadrunner-http installed.
     scanFiles:
         - stubs/frankenphp.stub

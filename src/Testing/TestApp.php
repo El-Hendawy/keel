@@ -23,6 +23,8 @@ use Psr\Http\Message\ServerRequestInterface;
  */
 final class TestApp
 {
+    public const string USER_AGENT = 'KeelTestApp/1.0';
+
     private function __construct(public readonly Application $application)
     {
     }
@@ -31,6 +33,67 @@ final class TestApp
     public static function boot(string $appFile, array $config = []): self
     {
         return new self(Application::boot($appFile, ['env' => 'test', 'debug' => true, 'config' => $config, 'testing' => true]));
+    }
+
+    /**
+     * Applies the framework's migrations for enabled features, then the application's.
+     *
+     * @return list<string> applied migration names
+     */
+    public function migrate(string $directory): array
+    {
+        return \Keel\Database\Migrator::forApplication($this->application, $directory)->migrate();
+    }
+
+    /**
+     * Drops every table, then migrates: a clean database for each test on any driver.
+     *
+     * @return list<string> applied migration names
+     */
+    public function freshDatabase(string $directory): array
+    {
+        TestDatabase::reset($this->container()->get(\Keel\Database\ConnectionManager::class)->writer());
+
+        return $this->migrate($directory);
+    }
+
+    /**
+     * Issues a real token through the application's token store and returns the headers
+     * to send it with. The token is bound to the test client (its User-Agent) on first use,
+     * exactly as in production.
+     *
+     * @param list<string> $scopes
+     * @return array<string, string>
+     */
+    public function tokenFor(string $principalId, ?string $tenantId = null, array $scopes = ['*'], string $kind = \Keel\Auth\Principal::USER): array
+    {
+        $issued = $this->container()->get(\Keel\Auth\Token\Tokens::class)->issue($principalId, $tenantId, $scopes, $kind);
+
+        return ['Authorization' => 'Bearer ' . $issued->token];
+    }
+
+    /**
+     * Processes every queued job that is ready, as `keel queue:work` would, including
+     * jobs those jobs push. Returns how many ran.
+     */
+    public function runJobs(int $limit = 1000): int
+    {
+        if (!$this->container()->has(\Keel\Database\ConnectionManager::class)) {
+            return 0; // without ->withQueue() jobs already ran when pushed
+        }
+        $queues = array_values(array_unique(array_map(static fn (array $job): string => $job['queue'], $this->application->manifest->jobs())));
+
+        return (new \Keel\Queue\QueueWorker($this->container()))->drain($queues === [] ? ['default'] : $queues, $limit);
+    }
+
+    /**
+     * Runs the scheduled tasks due at $at (default: the frozen clock's time).
+     *
+     * @return list<class-string>
+     */
+    public function runSchedule(?\DateTimeImmutable $at = null): array
+    {
+        return (new \Keel\Scheduling\Scheduler($this->container()))->runDue($at ?? $this->clock()->now());
     }
 
     public function container(): Container
@@ -120,6 +183,7 @@ final class TestApp
             $body = json_encode($body, \JSON_THROW_ON_ERROR);
             $headers += ['Content-Type' => 'application/json'];
         }
+        $headers += ['User-Agent' => self::USER_AGENT];
         $request = new ServerRequest($method, 'http://localhost' . $uri, $headers, $body, '1.1', ['REMOTE_ADDR' => '127.0.0.1']);
         parse_str((string) parse_url($uri, \PHP_URL_QUERY), $query);
         $request = $request->withQueryParams($query);

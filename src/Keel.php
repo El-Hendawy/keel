@@ -6,5 +6,5 @@ namespace Keel;
 
 final class Keel
 {
-    public const string VERSION = '0.1.0-dev';
+    public const string VERSION = '0.2.0-dev';
 }

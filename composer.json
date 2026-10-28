@@ -37,7 +37,8 @@
     "autoload-dev": {
         "psr-4": {
             "Keel\\Tests\\": "tests/",
-            "Shop\\": "examples/shop/src/"
+            "Shop\\": "examples/shop/src/",
+            "FixGateway\\": "examples/fix-gateway/src/"
         }
     },
     "bin": ["bin/keel"],

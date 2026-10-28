@@ -45,6 +45,14 @@ Nested calls use savepoints. A transaction left open when the request ends is ro
 With `replica_dsn` set, reads go to the replica until the scope writes; from then on they use the primary,
 so a request always reads its own writes.
 
+Each worker caches prepared statements per connection (`database.statement_cache`, default 256), so a
+repeated query skips the prepare round trip on PostgreSQL and MySQL.
+
+## Tenant isolation
+
+With `database.tenant_tables` set, statements on those tables must filter by the current tenant or they
+throw. See [tenancy](tenancy.md).
+
 ## N+1 detection
 
 The same statement executed more than `n_plus_one_threshold` times in one scope throws
@@ -53,5 +61,7 @@ The same statement executed more than `n_plus_one_threshold` times in one scope 
 
 ## Migrations
 
-`keel migrate` applies `migrations/*.sql` in filename order, once each, recording them in `keel_migrations`.
+`keel migrate` applies the framework's migrations for the features you enabled (`keel_tokens` for auth,
+`keel_jobs` and `keel_locks` for the queue), then `migrations/*.sql`, in filename order, once each, recording
+them in `keel_migrations`. `keel make:migration "add refunds"` creates a timestamped file.
 Forward-only: to undo, write a new migration. Run it as a release step before new workers start.

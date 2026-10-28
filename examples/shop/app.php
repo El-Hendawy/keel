@@ -13,6 +13,14 @@ return AppDefinition::create(__DIR__, 'shop')
     ->scan('src')
     ->config('config.php')
     ->withDatabase()
+    // Deny by default: every endpoint needs a token unless marked #[Anonymous]. Tokens are
+    // bound to the client fingerprint they were issued to.
+    ->withAuth()
+    // Jobs live in the database and commit with the request's transaction (outbox).
+    ->withQueue()
+    ->withWebhooks()
+    // Clients may ask for TOON (Accept: text/toon), which costs LLM agents far fewer tokens than JSON.
+    ->withToon()
     // Nodes are stateless in production: limits and idempotency keys live in Redis.
     ->bindIn('prod', RateLimitStore::class, RedisRateLimitStore::class)
     ->bindIn('prod', IdempotencyStore::class, RedisIdempotencyStore::class)
