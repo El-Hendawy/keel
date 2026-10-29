@@ -35,7 +35,18 @@ final class VectorContractTest extends TestCase
         self::assertSame([5, -3, 8], IntVector::fromArray(['a' => 5, 'b' => -3, 'c' => 8])->toArray(), 'keys are ignored');
         self::assertSame([1, 2], (new IntVector([1, 2]))->toArray());
         self::assertSame([], (new IntVector())->toArray());
+        $list = IntVector::fromArray([4, 5])->toArray();
+        $list[] = 6;
+        self::assertSame([0 => 4, 1 => 5, 2 => 6], $list, 'toArray() gives an ordinary list');
+        self::assertTrue(array_is_list(FloatVector::filled(1000, 0.5)->toArray()));
         self::assertSame([1.0, 2.5], FloatVector::fromArray([1, 2.5])->toArray(), 'ints become floats');
+        $holes = [1, 2, 3];
+        unset($holes[1]);
+        self::assertSame([1, 3], IntVector::fromArray($holes)->toArray(), 'holes left by unset() are skipped');
+        $references = [1, 2, 3];
+        $second = &$references[1];
+        $second = 7;
+        self::assertSame([1.0, 7.0, 3.0], FloatVector::fromArray($references)->toArray(), 'references are read through');
         self::assertSame([7, 7, 7], IntVector::filled(3, 7)->toArray());
         self::assertSame([3.0, 3.0], FloatVector::filled(2, 3)->toArray());
         self::assertSame([0, 3, 6, 9], IntVector::range(0, 10, 3)->toArray());
@@ -48,6 +59,7 @@ final class VectorContractTest extends TestCase
 
         $this->throws(\TypeError::class, 'at key 1 is float', fn () => IntVector::fromArray([1, 2.0]));
         $this->throws(\TypeError::class, 'at key b is string', fn () => FloatVector::fromArray(['a' => 1, 'b' => '2']));
+        $this->throws(\TypeError::class, 'at key 2 is string', fn () => IntVector::fromArray(array_slice([1, 2, 'x'], 1, preserve_keys: true)));
         $this->throws(\TypeError::class, 'bool given', fn () => IntVector::filled(1, true));
         $this->throws(\ValueError::class, 'greater than or equal to 0', fn () => IntVector::filled(-1, 0));
         $this->throws(\ValueError::class, 'cannot be 0', fn () => IntVector::range(0, 1, 0));

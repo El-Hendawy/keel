@@ -56,6 +56,21 @@ production refuse to boot without it, set:
 'vector' => ['require_native' => true],
 ```
 
+## Performance
+
+`benchmarks/vectors.php` compares plain arrays, the pure-PHP vectors and the extension, and checks that
+all three give the same results; `benchmarks/RESULTS.md` has one machine's numbers. On an Apple M4, the
+extension runs sums 7–16× faster than `array_sum()`, element-wise arithmetic and dot products 50–90×
+faster than a `foreach` loop, and sorts 5–8× faster than `sort()`, in a third of the memory.
+
+Converting between arrays and vectors (`fromArray()`, `toArray()`) costs about as much as one cheap
+operation. Vectors pay off when data stays a vector across several operations. The pure-PHP vectors
+are for portability: they give the same results, but run slower than hand-written array code.
+
+```bash
+php benchmarks/vectors.php --extension=ext/keel_vector/target/release/keel_vector.so [--jit] [--markdown]
+```
+
 ## Testing
 
 Both implementations must give the same results, so the same PHPUnit suites (`tests/Vector`) run against

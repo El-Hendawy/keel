@@ -220,14 +220,18 @@ fn where_i64_body(a: &[i64], cmp: Cmp<i64>) -> Vec<i64> {
     }
 }
 
+/// Without a branch per element: every index is written, and the write position only moves on a
+/// match, so random data costs no mispredictions.
 #[inline(always)]
 fn indices<T: Copy>(a: &[T], keep: impl Fn(T) -> bool) -> Vec<i64> {
-    let mut out = Vec::new();
+    let mut out = vec![0i64; a.len()];
+    let mut n = 0;
     for (i, &x) in a.iter().enumerate() {
-        if keep(x) {
-            out.push(i as i64);
-        }
+        out[n] = i as i64;
+        n += keep(x) as usize;
     }
+    out.truncate(n);
+    out.shrink_to_fit();
     out
 }
 

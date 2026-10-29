@@ -8,7 +8,6 @@ use std::sync::Once;
 use ext_php_rs::{
     boxed::ZBox,
     class::RegisteredClass,
-    convert::IntoZval,
     prelude::*,
     types::ZendHashTable,
     zend::{ce, ClassEntry},
@@ -22,6 +21,24 @@ mod kernels;
 #[cfg(test)]
 mod kernel_tests;
 mod simd;
+
+/// The values of a packed array (a list built by appending), read in place, or `None` for a hash.
+/// Slots left by `unset()` are UNDEF zvals, which callers skip.
+pub(crate) fn packed(values: &ZendHashTable) -> Option<&[ext_php_rs::types::Zval]> {
+    // Zend/zend_types.h; ext-php-rs does not export it.
+    const HASH_FLAG_PACKED: u32 = 1 << 2;
+    // SAFETY: `u.flags` is always initialised. With the packed flag set, `arPacked` points at
+    // `nNumUsed` initialised zvals owned by the array, which the borrow keeps alive and unchanged.
+    unsafe {
+        if values.u.flags & HASH_FLAG_PACKED == 0 {
+            return None;
+        }
+        if values.nNumUsed == 0 {
+            return Some(&[]);
+        }
+        Some(std::slice::from_raw_parts(values.__bindgen_anon_1.arPacked, values.nNumUsed as usize))
+    }
+}
 
 /// Reports how the extension was built and which SIMD path it uses on this CPU.
 #[php_class]
@@ -71,11 +88,55 @@ pub(crate) fn json_serializable() -> &'static ClassEntry {
     find_class("JsonSerializable").unwrap_or_else(ce::exception)
 }
 
-/// The values as a PHP list.
-pub(crate) fn list<T: IntoZval + Copy>(values: &[T]) -> PhpResult<ZBox<ZendHashTable>> {
-    let mut array = ZendHashTable::with_capacity(u32::try_from(values.len()).unwrap_or(u32::MAX));
-    for &v in values {
-        array.push(v).map_err(|e| PhpException::from_message(e.to_string()))?;
+/// A value a vector holds, as the zval PHP stores for it.
+pub(crate) trait Element: Copy {
+    fn zval(self) -> ext_php_rs::types::Zval;
+}
+
+impl Element for i64 {
+    fn zval(self) -> ext_php_rs::types::Zval {
+        let mut z = ext_php_rs::types::Zval::new();
+        z.set_long(self);
+        z
+    }
+}
+
+impl Element for f64 {
+    fn zval(self) -> ext_php_rs::types::Zval {
+        let mut z = ext_php_rs::types::Zval::new();
+        z.set_double(self);
+        z
+    }
+}
+
+extern "C" {
+    // Zend/zend_hash.h (ZEND_API); ext-php-rs does not bind it.
+    fn zend_hash_real_init_packed(ht: *mut ZendHashTable);
+}
+
+/// The values as a PHP list, written straight into a packed array (what Zend's
+/// `ZEND_HASH_FILL_PACKED` does) instead of one insert call per element.
+pub(crate) fn list<T: Element>(values: &[T]) -> PhpResult<ZBox<ZendHashTable>> {
+    let length = u32::try_from(values.len())
+        .map_err(|_| PhpException::from_message(format!("{} elements do not fit in a PHP array", values.len())))?;
+    let mut array = ZendHashTable::with_capacity(length);
+    if length == 0 {
+        return Ok(array);
+    }
+    // SAFETY: the array is new and uninitialised with room for `length` elements; initialising it as
+    // packed allocates `nTableSize >= length` slots. Each slot is written once with a scalar zval
+    // (no reference count to take), then the counts are set as Zend's fill macros set them.
+    unsafe {
+        let ht: *mut ZendHashTable = &mut *array;
+        zend_hash_real_init_packed(ht);
+        let slots = (*ht).__bindgen_anon_1.arPacked;
+        for (i, &v) in values.iter().enumerate() {
+            slots.add(i).write(v.zval());
+        }
+        (*ht).nNumUsed = length;
+        (*ht).nNumOfElements = length;
+        (*ht).nNextFreeElement = i64::from(length);
+        (*ht).nInternalPointer = 0;
     }
     Ok(array)
 }

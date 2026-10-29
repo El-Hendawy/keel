@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use ext_php_rs::{
     boxed::ZBox,
-    flags::ClassFlags,
+    flags::{ClassFlags, DataType},
     prelude::*,
     types::{ZendCallable, ZendClassObject, ZendHashTable, Zval},
     zend::ce,
@@ -53,15 +53,24 @@ impl FloatVector {
         let mut out = Vec::new();
         out.try_reserve_exact(values.len())
             .map_err(|_| errors::vector(format!("{CLASS}::{method}(): cannot allocate {} elements", values.len())))?;
+        let refuse = |key: String, value: &Zval| {
+            errors::type_error(format!("{CLASS}::{method}(): the value at key {key} is {}, but a FloatVector holds only float and int values; convert them first", type_name(value)))
+        };
+        // A list is stored packed: its values are read in place, skipping holes left by unset().
+        if let Some(slots) = crate::packed(values) {
+            for (index, value) in slots.iter().enumerate() {
+                match number(value) {
+                    Some(v) => out.push(v),
+                    None if value.get_type() == DataType::Undef => {}
+                    None => return Err(refuse(index.to_string(), value)),
+                }
+            }
+            return Ok(out);
+        }
         for (key, value) in values.iter() {
             match number(value) {
                 Some(v) => out.push(v),
-                None => {
-                    return Err(errors::type_error(format!(
-                        "{CLASS}::{method}(): the value at key {key} is {}, but a FloatVector holds only float and int values; convert them first",
-                        type_name(value)
-                    )))
-                }
+                None => return Err(refuse(key.to_string(), value)),
             }
         }
         Ok(out)

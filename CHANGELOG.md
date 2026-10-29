@@ -22,6 +22,7 @@ listed under **Breaking** with an upgrade note.
   `vector.require_native` makes production require the extension.
   Both implementations pass one contract suite and property tests against PHP's array functions; the
   kernels are tested at every SIMD level against a scalar reference, and under AddressSanitizer.
+  `benchmarks/vectors.php` compares them with plain arrays (results in `benchmarks/RESULTS.md`).
 - **Money and ledgers.** `Money` (integer minor units, ISO 4217 scales, rounding modes, lossless
   allocation) as a domain and API type; constraints `Decimal`, `CurrencyCode`, `Iban`, `Bic`, `CardNumber`;
   `->withLedger()`: a double-entry ledger with balanced, idempotent postings, overdraft limits, reversals,

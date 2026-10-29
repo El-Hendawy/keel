@@ -57,6 +57,7 @@ KEEL_TEST_DATABASE_DSN='pgsql-async:host=127.0.0.1;dbname=keel_test;user=keel' v
 KEEL_TEST_REDIS_URL=redis://127.0.0.1:6379 vendor/bin/phpunit tests/Server tests/Queue
 vendor/bin/phpstan analyse -c phpstan.neon.dist examples/shop/var/build/test   # generated code
 php -d opcache.enable_cli=1 benchmarks/kernel.php
+php benchmarks/vectors.php --extension=ext/keel_vector/target/release/keel_vector.so   # vectors
 ```
 
 On macOS with the repository on an exFAT drive, delete AppleDouble files before running PHPUnit:
