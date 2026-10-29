@@ -77,6 +77,10 @@ listed under **Breaking** with an upgrade note.
 
 ### Fixed
 
+- `Jwk::fromOpenSsl()` dropped leading zero bytes from EC coordinates, so about one key in 64 produced a
+  JWK that `Jwk::toKey()` refused. That broke one in about 64 end-to-end-encrypted messages (each has a
+  fresh ephemeral key), and affected DPoP proofs and published key sets the same way. Coordinates are now
+  padded to the curve size, as RFC 7518 requires.
 - The supervisor's signal handlers no longer restart interrupted system calls, so SIGTERM stops it.
 
 ## 0.2.0 (unreleased)

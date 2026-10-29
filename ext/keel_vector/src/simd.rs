@@ -3,10 +3,12 @@
 use std::sync::OnceLock;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
 pub enum Level {
+    #[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
     Avx2,
+    #[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
     Sse42,
+    #[cfg_attr(not(target_arch = "aarch64"), allow(dead_code))]
     Neon,
     Scalar,
 }

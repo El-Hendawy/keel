@@ -49,6 +49,28 @@ final class EncryptionTest extends TestCase
         $this->assertFails(static fn () => $crypto->decrypt('plaintext'), 'not a ciphertext');
     }
 
+    public function testEcPublicKeysKeepLeadingZeroBytes(): void
+    {
+        // OpenSSL drops leading zeros from coordinates: about one P-256 key in 64 has a short x or y.
+        // Generate keys until both curves have shown one, and check every JWK has full-size coordinates.
+        foreach (['prime256v1' => 32, 'secp384r1' => 48] as $curve => $size) {
+            $short = 0;
+            for ($i = 0; $i < 2000 && $short < 2; $i++) {
+                $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => $curve]);
+                self::assertNotFalse($key);
+                $details = openssl_pkey_get_details($key);
+                self::assertIsArray($details);
+                $short += (int) (\strlen($details['ec']['x']) < $size || \strlen($details['ec']['y']) < $size);
+                $jwk = \Keel\Auth\Jwt\Jwk::fromOpenSsl($key);
+                foreach (['x', 'y'] as $c) {
+                    self::assertSame($size, \strlen((string) base64_decode(strtr($jwk[$c], '-_', '+/'), true)), "$curve $c");
+                }
+                Jwe::publicKey($jwk);
+            }
+            self::assertGreaterThan(0, $short, "no $curve key with a short coordinate was generated");
+        }
+    }
+
     public function testKeyRotation(): void
     {
         $old = new Encrypter(new Keys(), ['a' => self::KEY_A]);

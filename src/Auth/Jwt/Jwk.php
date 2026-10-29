@@ -80,8 +80,11 @@ final class Jwk
                 'secp384r1' => 'P-384',
                 default => throw new \InvalidArgumentException('Unsupported curve.'),
             };
+            // OpenSSL drops leading zero bytes; RFC 7518 section 6.2.1.2 wants the full curve size.
+            $size = self::CURVES[$crv][1];
+            $coordinate = static fn (mixed $v): string => str_pad(\is_string($v) ? $v : '', $size, "\0", STR_PAD_LEFT);
 
-            return ['kty' => 'EC', 'crv' => $crv, 'x' => $b64($details['ec']['x'] ?? ''), 'y' => $b64($details['ec']['y'] ?? '')];
+            return ['kty' => 'EC', 'crv' => $crv, 'x' => $b64($coordinate($details['ec']['x'] ?? '')), 'y' => $b64($coordinate($details['ec']['y'] ?? ''))];
         }
         if (isset($details['rsa']) && \is_array($details['rsa'])) {
             return ['kty' => 'RSA', 'n' => $b64($details['rsa']['n'] ?? ''), 'e' => $b64($details['rsa']['e'] ?? '')];
