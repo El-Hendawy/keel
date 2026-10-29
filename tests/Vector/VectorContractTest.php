@@ -143,7 +143,7 @@ final class VectorContractTest extends TestCase
         self::assertSame([3.0, -4.0, 8.0], $f->mul(2)->toArray());
         self::assertSame([0.75, -1.0, 2.0], $f->div(2.0)->toArray());
         self::assertSame([2.5, -1.0, 5.0], $f->add(FloatVector::filled(3, 1))->toArray());
-        self::assertSame(['INF', '-INF', 'NAN'], array_map(strval(...), FloatVector::fromArray([1, -1, 0])->div(0)->toArray()));
+        self::assertSame(['INF', '-INF', 'NAN'], array_map(static fn (float $x): string => is_nan($x) ? 'NAN' : (string) $x, FloatVector::fromArray([1, -1, 0])->div(0)->toArray()));
         self::assertSame(11.0, FloatVector::fromArray([1, 2])->dot(FloatVector::fromArray([3, 4])));
 
         $values = array_map(static fn (int $i): float => $i * 0.1, range(0, 36));
