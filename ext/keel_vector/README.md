@@ -30,6 +30,14 @@ versions installed, choose one with `PHP_CONFIG`:
 PHP_CONFIG=/usr/bin/php-config8.4 ext/keel_vector/build.sh
 ```
 
+If the build stops with `Unable to generate bindings for PHP` and errors in `xmmintrin.h` or
+`emmintrin.h`, the libclang that bindgen loaded comes from a different LLVM version than the clang headers
+it found. Point both at one version:
+
+```bash
+LIBCLANG_PATH=/usr/lib/llvm-18/lib CLANG_PATH=/usr/bin/clang-18 ext/keel_vector/build.sh
+```
+
 ### macOS (Apple silicon and Intel)
 
 ```bash

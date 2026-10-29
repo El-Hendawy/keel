@@ -193,6 +193,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - name: One LLVM for bindgen (libclang and its headers from the same version)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y clang-18 libclang-18-dev
+          echo "LIBCLANG_PATH=/usr/lib/llvm-18/lib" >> "$GITHUB_ENV"
+          echo "CLANG_PATH=/usr/bin/clang-18" >> "$GITHUB_ENV"
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ext/keel_vector
@@ -225,7 +231,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ext/keel_vector
-      - run: sudo apt-get update && sudo apt-get install -y valgrind
+      - name: Valgrind, and one LLVM for bindgen
+        run: |
+          sudo apt-get update && sudo apt-get install -y clang-18 libclang-18-dev valgrind
+          echo "LIBCLANG_PATH=/usr/lib/llvm-18/lib" >> "$GITHUB_ENV"
+          echo "CLANG_PATH=/usr/bin/clang-18" >> "$GITHUB_ENV"
       - run: composer install --no-interaction --no-progress
       - name: Vector suites under valgrind
         run: make -C ext/keel_vector valgrind
