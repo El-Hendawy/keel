@@ -55,3 +55,17 @@ production refuse to boot without it, set:
 ```php
 'vector' => ['require_native' => true],
 ```
+
+## Testing
+
+Both implementations must give the same results, so the same PHPUnit suites (`tests/Vector`) run against
+each: a contract suite, and property tests that compare random vectors with `array_sum()`, `min()`, `max()`,
+`sort()`, `array_unique()` and `array_filter()`. A failing property test prints its seed;
+`KEEL_VECTOR_SEED=<seed>` replays it. In `ext/keel_vector`:
+
+```bash
+make test        # Rust: every kernel at every SIMD level the CPU runs, against a scalar reference
+make test-php    # the PHP suites with the pure-PHP implementation, then with the extension
+make valgrind    # Linux: the PHP suites under valgrind
+make asan        # macOS, nightly Rust: the PHP suites with an AddressSanitizer build
+```

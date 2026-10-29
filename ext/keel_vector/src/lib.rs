@@ -19,6 +19,8 @@ mod float_vector;
 mod int_vector;
 mod iterator;
 mod kernels;
+#[cfg(test)]
+mod kernel_tests;
 mod simd;
 
 /// Reports how the extension was built and which SIMD path it uses on this CPU.

@@ -23,6 +23,11 @@ final class VectorContractTest extends TestCase
         self::assertSame(\extension_loaded('keel_vector'), VectorInfo::isNative());
         self::assertContains(VectorInfo::simdLevel(), VectorInfo::isNative() ? ['avx2', 'sse4.2', 'neon', 'scalar'] : ['php']);
         self::assertSame('0.1.0', VectorInfo::version());
+        // Set by `make test-php` so a run meant for the extension cannot fall back to the polyfill.
+        $expected = getenv('KEEL_VECTOR_BACKEND');
+        if (\is_string($expected) && $expected !== '') {
+            self::assertSame($expected, VectorInfo::isNative() ? 'native' : 'php');
+        }
     }
 
     public function testConstructionAndConversion(): void
