@@ -1,0 +1,20 @@
+[package]
+name = "keel_vector"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Typed, contiguous, SIMD-accelerated vectors for the Keel PHP framework"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ext-php-rs = "=0.16.3"
+
+[profile.release]
+codegen-units = 1
+lto = true
+panic = "unwind"
+strip = "symbols"

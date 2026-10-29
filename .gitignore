@@ -6,3 +6,6 @@
 ._*
 .DS_Store
 /site/
+/ext/*/target/
+*.so
+*.dylib

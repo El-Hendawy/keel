@@ -1,0 +1,3 @@
+# PHP resolves the Zend symbols when it loads the extension, not the linker.
+[target.'cfg(target_os = "macos")']
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
