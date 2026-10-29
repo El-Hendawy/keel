@@ -225,7 +225,8 @@ impl IntVector {
         self.set_at(index, value, "offsetSet")
     }
 
-    pub fn offset_unset(&mut self, _offset: &Zval) -> PhpResult<()> {
+    pub fn offset_unset(&mut self, offset: &Zval) -> PhpResult<()> {
+        let _ = offset;
         Err(errors::vector(format!(
             "{CLASS}::offsetUnset(): a vector has no holes, so its elements cannot be unset; use slice(), filter() or pop()"
         )))

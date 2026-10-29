@@ -37,6 +37,11 @@ impl VectorInfo {
     pub fn version() -> String {
         env!("CARGO_PKG_VERSION").to_owned()
     }
+
+    /// True here; false in the pure-PHP implementation.
+    pub fn is_native() -> bool {
+        true
+    }
 }
 
 /// Finds a class of PHP's core or SPL by name, also while the module starts, when

@@ -41,7 +41,8 @@
     },
     "autoload": {
         "psr-4": { "Keel\\": "src/" },
-        "files": ["src/Async/functions.php"]
+        "files": ["src/Async/functions.php", "src/Vector/Polyfill/autoload.php"],
+        "exclude-from-classmap": ["src/Vector/Polyfill/"]
     },
     "autoload-dev": {
         "psr-4": {

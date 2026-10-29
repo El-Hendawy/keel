@@ -13,22 +13,16 @@ use Keel\Vector\VectorInfo;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The behaviour every implementation of the vectors must share. Runs against whichever
- * implementation is loaded: `php -d extension=keel_vector.so vendor/bin/phpunit tests/Vector`.
+ * The behaviour every implementation of the vectors must share. Runs against whichever is loaded:
+ * the pure-PHP one by default, the extension with `php -d extension=keel_vector.so vendor/bin/phpunit`.
  */
 final class VectorContractTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        if (!class_exists(IntVector::class)) {
-            self::markTestSkipped('keel_vector is not loaded; build it with ext/keel_vector/build.sh');
-        }
-    }
-
     public function testReportsTheBackend(): void
     {
-        self::assertContains(VectorInfo::simdLevel(), ['avx2', 'sse4.2', 'neon', 'scalar']);
-        self::assertMatchesRegularExpression('/^\d+\.\d+\.\d+$/', VectorInfo::version());
+        self::assertSame(\extension_loaded('keel_vector'), VectorInfo::isNative());
+        self::assertContains(VectorInfo::simdLevel(), VectorInfo::isNative() ? ['avx2', 'sse4.2', 'neon', 'scalar'] : ['php']);
+        self::assertSame('0.1.0', VectorInfo::version());
     }
 
     public function testConstructionAndConversion(): void
@@ -44,7 +38,8 @@ final class VectorContractTest extends TestCase
         self::assertSame([0.0, 0.25, 0.5, 0.75, 1.0], FloatVector::range(0, 1, 0.25)->toArray());
         self::assertCount(11, FloatVector::range(0, 1, 0.1), 'the end is kept despite rounding');
         self::assertTrue(IntVector::empty()->isEmpty());
-        self::assertSame(80, IntVector::filled(10, 0)->memoryBytes());
+        self::assertGreaterThanOrEqual(80, IntVector::filled(10, 0)->memoryBytes());
+        self::assertSame(0, IntVector::empty()->memoryBytes());
 
         $this->throws(\TypeError::class, 'at key 1 is float', fn () => IntVector::fromArray([1, 2.0]));
         $this->throws(\TypeError::class, 'at key b is string', fn () => FloatVector::fromArray(['a' => 1, 'b' => '2']));
