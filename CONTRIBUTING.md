@@ -39,6 +39,16 @@ composer install
 composer check
 ```
 
+Changes to the vector extension (`ext/keel_vector`, Rust) also need, from that directory:
+
+```bash
+make test                                  # Rust tests at every SIMD level the CPU runs
+make test-php                              # the PHP vector suites, without and with the extension
+cargo clippy --all-targets -- -D warnings
+```
+
+`make valgrind` (Linux) and `make asan` (macOS, nightly Rust) check memory safety; CI runs valgrind.
+
 If your checkout is on a filesystem Composer cannot extract to, put the vendor directory elsewhere with
 `COMPOSER_VENDOR_DIR=/path/to/vendor composer install`; the test bootstrap and `bin/keel` honour it.
 

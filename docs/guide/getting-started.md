@@ -4,6 +4,7 @@
 
 Requirements: PHP 8.3+ with `ext-json` and `ext-mbstring`, plus `ext-pdo` and the driver for your database,
 `ext-curl` for the HTTP client, `ext-pcntl` for graceful shutdown and `ext-redis` for shared stores.
+The [`keel_vector` extension](vectors.md#the-extension) is optional: without it, numeric vectors run in PHP.
 
 ```bash
 composer global require el-hendawy/keel     # once: installs the `keel` command

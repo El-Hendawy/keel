@@ -36,7 +36,7 @@ final readonly class CreateInvoiceWhenOrderPlaced
 }
 ```
 
-Listeners run synchronously in the current scope (and transaction). Asynchronous delivery through the
-transactional outbox is on the roadmap.
+Listeners run synchronously in the current scope (and transaction). `#[Listener(async: true)]` delivers the
+event through the transactional outbox instead, as a job (see [async listeners](background-work.md#async-listeners)).
 
 Modules show up in `keel inspect`, and their names become OpenAPI tags.

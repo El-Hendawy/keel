@@ -56,7 +56,8 @@ PostgreSQL and Redis, WebSockets and server-sent events. It also adds OpenID Con
 DPoP proof-of-possession tokens, broker transports (Redis Streams, SQS, RabbitMQ), and a PHPStan
 extension that checks ORM queries, and then encryption at rest and end to end, money and a hash-chained
 ledger, microservice plumbing (service identity, deadlines, CloudEvents with outbox and inbox, Kubernetes
-manifests) and drivers for MongoDB, DynamoDB, Elasticsearch/OpenSearch, CouchDB, Neo4j and InfluxDB.
+manifests), drivers for MongoDB, DynamoDB, Elasticsearch/OpenSearch, CouchDB, Neo4j and InfluxDB, and
+numeric vectors with an optional Rust extension that runs them with SIMD.
 Everything below is implemented and tested; items marked *planned* are on the
 [roadmap](docs/manifesto.md#roadmap).
 
@@ -72,6 +73,7 @@ Everything below is implemented and tested; items marked *planned* are on the
 | Fintech | Exact `Money` (ISO 4217 scales, seven rounding modes, lossless allocation) usable as an API type; a **double-entry ledger** with idempotent postings, overdraft limits, reversals and a verifiable hash chain ([guide](docs/guide/fintech.md)) |
 | Microservices | `->withServices()`: calls by service name with service tokens (JWT or OAuth client credentials), tenant, trace, request id and **deadline propagation**; CloudEvents through the outbox and an exactly-once `Inbox`; `keel deploy:docker` and `deploy:kubernetes` ([guide](docs/guide/microservices.md)) |
 | Non-relational | MongoDB (wire protocol, SCRAM, Decimal128), DynamoDB, Elasticsearch/OpenSearch, CouchDB, Neo4j and InfluxDB in PHP, non-blocking under `keel run`; one `DocumentStore` interface ([guide](docs/guide/nosql.md)) |
+| Numeric vectors | `IntVector` and `FloatVector`: exact, overflow-checked integer arithmetic, fixed-order float sums (identical on every machine), comparisons that return indices, gather, sort, unique; usable as API types. The optional `keel_vector` extension (Rust, SIMD chosen at run time) runs them 5–90× faster than plain arrays in a third of the memory; without it, a pure-PHP implementation gives the same results ([guide](docs/guide/vectors.md)) |
 | Wire formats | JSON, and [TOON](docs/guide/toon.md) (Token-Oriented Object Notation) with `->withToon()`: negotiated by `Accept`, accepted as request bodies, listed in OpenAPI |
 | FIX | Native [FIX](docs/guide/fix.md) engine (`keel fix:run`): acceptor and initiator sessions, logon, sequence recovery with resend and gap fill, heartbeats, rejects; typed messages and repeating groups compiled at build time; handlers per message type |
 | OpenAPI and SDK | OpenAPI 3.1 generated from the same types, including security; `keel sdk` writes a typed, dependency-free TypeScript client |
@@ -88,11 +90,12 @@ Everything below is implemented and tested; items marked *planned* are on the
 | Observability | OpenTelemetry-style traces (W3C `traceparent`, OTLP/HTTP export), Prometheus RED metrics per route, JSON logs with trace ids, `/health/live`, `/health/ready` |
 | Safety defaults | Rate limiting, idempotency keys, load shedding, body limits, security headers, `trustProxy()` named as unsafe, problem+json errors, production boot checks (debug, local-only stores, public metrics, missing `app.key`) |
 | Testing | In-process `TestApp`; frozen clock, seeded randomness, sequential ids and a fake HTTP client are bound automatically in `test`; `tokenFor()`, `runJobs()`, `runSchedule()`; the same tests run on SQLite, PostgreSQL or MySQL (`KEEL_TEST_DATABASE_DSN`) |
-| Tooling | `keel new`, `build`, `routes`, `inspect` (JSON for agents), `openapi`, `sdk`, `check`, `migrate`, `serve`, `make:endpoint`, `make:migration`, `token:*`, `key:generate`, `queue:*`, `schedule:*` ([reference](docs/guide/tooling.md)) |
+| Tooling | `keel new`, `build`, `routes`, `inspect` (JSON for agents), `openapi`, `sdk`, `check`, `migrate`, `serve`, `make:endpoint`, `make:migration`, `token:*`, `key:generate`, `queue:*`, `schedule:*`, `crypto:*`, `deploy:*`, `vector:info` ([reference](docs/guide/tooling.md)) |
 | Planned | Non-blocking MySQL, gRPC, WebSocket compression, typed JSON columns, tenant connection routing, FIX over TLS, Cassandra (CQL), MongoDB transactions |
 
 Quality bar, enforced in CI: PHPStan **level max** with zero errors on the framework, the example
-application **and the generated code**.
+application **and the generated code**. The vector extension is built and tested on Linux x86_64 and
+aarch64 (PHP 8.3 to 8.5, and thread-safe PHP) and macOS, linted with clippy and run under valgrind.
 
 ## Quick start
 
@@ -175,6 +178,7 @@ The site at <https://el-hendawy.github.io/keel/> is built from `docs/` on every 
   [ORM](docs/guide/orm.md) · [the Keel server](docs/guide/server.md) · [real time](docs/guide/realtime.md) ·
   [TOON](docs/guide/toon.md) · [FIX](docs/guide/fix.md) · [microservices](docs/guide/microservices.md) ·
   [encryption](docs/guide/encryption.md) · [money and ledgers](docs/guide/fintech.md) · [non-relational databases](docs/guide/nosql.md) ·
+  [numeric vectors](docs/guide/vectors.md) ·
   [concurrency](docs/guide/concurrency.md) · [database](docs/guide/database.md) ·
   [observability](docs/guide/observability.md) · [production](docs/guide/production.md) · [testing](docs/guide/testing.md) ·
   [tooling](docs/guide/tooling.md)
@@ -208,10 +212,20 @@ the created order now also writes an outbox job. Peak memory after 13,000 reques
 measure framework overhead only. For end-to-end numbers against Laravel Octane, see
 [benchmarks/vs-laravel](benchmarks/vs-laravel/README.md) (measured on v0.1).
 
+Numeric vectors at 10 million elements, Apple M4, JIT off ([all sizes, the JIT and the method](benchmarks/RESULTS.md)):
+
+| Operation | PHP array | Pure-PHP vector | `keel_vector` extension |
+| --- | ---: | ---: | ---: |
+| Float sum (`array_sum`) | 14.7 ms | 101 ms | 1.15 ms |
+| Dot product (`foreach`) | 131 ms | 162 ms | 2.3 ms |
+| Sort (`sort`) | 1.34 s | 1.63 s | 176 ms |
+| Memory | 256 MiB | 256 MiB | 76 MiB |
+
 ## Requirements
 
 PHP 8.3+ (`ext-json`, `ext-mbstring`; `ext-curl` for the HTTP client, `ext-pcntl` for graceful shutdown,
-`ext-pdo` plus the driver for your database, `ext-redis` for shared stores). Following the support policy, v1.0 will
+`ext-pdo` plus the driver for your database, `ext-redis` for shared stores). The `keel_vector` extension is
+optional and needs Rust to build (Linux and macOS; [build steps](ext/keel_vector/README.md)). Following the support policy, v1.0 will
 require the current and previous PHP release.
 
 ## License

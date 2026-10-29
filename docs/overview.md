@@ -141,6 +141,13 @@ validation code:
     MongoDB, DynamoDB, Elasticsearch/OpenSearch, CouchDB, Neo4j and InfluxDB drivers in PHP, non-blocking
     under `keel run`, behind one `DocumentStore`.
 
+-   :material-vector-line: **Numeric vectors**
+
+    ---
+
+    `IntVector` and `FloatVector` with exact integers and reproducible float sums. The optional Rust
+    extension runs them with SIMD, 5–90× faster than arrays in a third of the memory.
+
 </div>
 
 ## Five minutes to a running API

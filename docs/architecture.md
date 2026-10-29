@@ -114,3 +114,12 @@ exactly like a request. A job's tenant and trace context travel with it. See
 - Arrays in generated files are immutable and live in opcache shared memory.
 
 See `benchmarks/kernel.php` for numbers.
+
+### Optional native code
+
+Keel is PHP. The one native component, the `keel_vector` extension (Rust, `ext/keel_vector`), is optional:
+when it is not loaded, Composer's autoloader loads `src/Vector/Polyfill`, which declares the same classes
+with the same results, exceptions and messages. Both implementations run one contract suite and the same
+property tests; `stubs/keel_vector.stub.php` is the API both must match. Its kernels pick AVX2, SSE4.2 or
+NEON once per process, and float sums add in one fixed order so results never depend on the CPU. See
+[numeric vectors](guide/vectors.md).

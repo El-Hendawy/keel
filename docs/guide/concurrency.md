@@ -22,13 +22,15 @@ use function Keel\Async\await_all;
 - `timeout:` cancels everything and throws `Keel\Async\TimeoutException`.
 - No operation outlives the `await_all` call, so nothing leaks into the next request.
 
-## What actually runs concurrently in v0.1
+## What actually runs concurrently
 
 | Operation | Behaviour inside `await_all` |
 | --- | --- |
 | HTTP through the framework client (`ClientInterface`, `ResilientHttpClient`) | Concurrent (curl_multi) |
 | `Keel\Async\delay()` | Concurrent |
-| PDO queries | Sequential: PDO blocks. Non-blocking drivers are on the roadmap |
+| PostgreSQL through the [`pgsql-async:` driver](database.md#non-blocking-postgresql) | Does not block: other tasks keep running, and under [`keel run`](server.md) so do other requests. One request's queries share its connection, so they run one after another |
+| Redis pub/sub, the [non-relational drivers](nosql.md) | Non-blocking under `keel run` |
+| PDO queries (`pgsql:`, MySQL, SQLite and the rest) | Sequential: PDO blocks the process. Non-blocking MySQL is planned |
 | Any other blocking call (`sleep`, `file_get_contents` on a URL) | Blocks the worker; avoid it |
 
 The same code works under FPM: outside a fiber, the calls run the loop until done.

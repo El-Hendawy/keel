@@ -51,7 +51,8 @@ A production worker refuses to start when:
 - the application has job handlers but no real queue, or scheduled tasks but no shared lock store;
 - `trustProxy()` trusts every address;
 - `/metrics` is enabled without `metrics.token`;
-- `app.key` is missing or shorter than 32 bytes.
+- `app.key` is missing or shorter than 32 bytes;
+- `vector.require_native` is set and the `keel_vector` extension is not loaded.
 
 Use Redis-backed stores in production:
 
@@ -73,6 +74,19 @@ KEEL_ENV=prod vendor/bin/keel schedule:work       # one or more; each task still
 
 Both stop cleanly on SIGTERM. `KEEL_MAX_REQUESTS` and `KEEL_MAX_MEMORY_MB` do not apply to them; restart
 workers on deploy so they load the new build.
+
+## The vector extension
+
+If the application uses numeric vectors for heavy work, build `keel_vector` in the image with the same
+PHP it will run on (`ext/keel_vector/build.sh`, which needs Rust), add the `extension=` line, and set
+`'vector' => ['require_native' => true]` so a missing extension fails the boot instead of falling back to
+PHP silently. `keel vector:info` shows what is loaded.
+
+The extension stores vector elements outside PHP's memory manager. `memory_limit`, `memory_get_usage()`
+and the memory threshold that recycles a worker do not see them. Limit sizes where data comes in
+(`#[Count(max: ...)]` on API inputs), and rely on the container's memory limit as the real ceiling. See
+the [vectors guide](vectors.md#the-extension) and the extension's
+[README](https://github.com/El-Hendawy/keel/blob/main/ext/keel_vector/README.md).
 
 ## Behind a load balancer
 
