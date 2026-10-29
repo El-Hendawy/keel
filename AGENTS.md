@@ -29,6 +29,7 @@ Instructions for coding agents and new contributors working on this repository.
 | `src/Money`, `src/Ledger` | Exact money and the double-entry, hash-chained ledger |
 | `src/Service` | Microservices: service calls and tokens, deadlines, CloudEvents, the inbox |
 | `src/NoSql` | MongoDB (wire protocol, BSON), DynamoDB, Elasticsearch/OpenSearch, CouchDB, Neo4j, InfluxDB, `DocumentStore` |
+| `ext/keel_vector`, `src/Vector/Polyfill` | `IntVector`/`FloatVector`: the Rust extension (ext-php-rs) and its pure-PHP twin, loaded when the extension is not; `stubs/keel_vector.stub.php` is the API |
 | `src/Database`, `src/Observability`, `src/Events`, `src/Module`, `src/Testing`, `src/Console` | As named |
 | `examples/shop` | The reference application; the end-to-end tests run against it |
 | `tests/Fixtures` | Small applications that must fail or succeed to build |

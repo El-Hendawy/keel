@@ -193,6 +193,7 @@ final class HydratorCompiler
             ],
             TypeInfo::OBJECT => $this->object($type->classOrFail(), $v, $out, $ok, $path),
             TypeInfo::LIST => $this->list($type, $v, $out, $ok, $path),
+            TypeInfo::VECTOR => $this->vector($type->classOrFail(), $v, $out, $ok, $path),
         };
         foreach ($inner as $line) {
             $lines[] = '    ' . $line;
@@ -267,6 +268,37 @@ final class HydratorCompiler
         return [
             "$out = self::o_" . self::id($class) . "($v, $path, \$errors, \$lenient);",
             "$ok = $out !== null;",
+        ];
+    }
+
+    /**
+     * A JSON array of numbers into an IntVector or FloatVector. The vector checks the values itself;
+     * only when it refuses them are the items walked to report each bad one by path.
+     *
+     * @return list<string>
+     */
+    private function vector(string $class, string $v, string $out, string $ok, string $path): array
+    {
+        $n = $this->var;
+        $int = $class === \Keel\Vector\IntVector::class;
+        $check = $int ? "\\is_int(\$x$n)" : "\\is_int(\$x$n) || \\is_float(\$x$n)";
+        $message = Php::string($int ? 'Must be an integer.' : 'Must be a number.');
+
+        return [
+            "if (!\\is_array($v) || !\\array_is_list($v)) {",
+            "    \$errors[] = new Violation($path, 'type', 'Must be a list.');",
+            '} else {',
+            '    try {',
+            "        $out = \\$class::fromArray($v);",
+            "        $ok = true;",
+            '    } catch (\\TypeError) {',
+            "        foreach ($v as \$k$n => \$x$n) {",
+            "            if (!($check)) {",
+            "                \$errors[] = new Violation($path . '[' . \$k$n . ']', 'type', $message);",
+            '            }',
+            '        }',
+            '    }',
+            '}',
         ];
     }
 

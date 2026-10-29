@@ -158,11 +158,15 @@ final class TypeAnalyzer
             return new TypeInfo(TypeInfo::DATETIME, $nullable, \DateTimeImmutable::class);
         }
 
+        if ($name === \Keel\Vector\IntVector::class || $name === \Keel\Vector\FloatVector::class) {
+            return new TypeInfo(TypeInfo::VECTOR, $nullable, $name);
+        }
+
         if (class_exists($name)) {
             return new TypeInfo(TypeInfo::OBJECT, $nullable, $name);
         }
 
-        $this->errors[] = "$where has type $name, which is not supported in an input or output contract (use scalars, backed enums, DateTimeImmutable, typed classes or lists of those).";
+        $this->errors[] = "$where has type $name, which is not supported in an input or output contract (use scalars, backed enums, DateTimeImmutable, IntVector, FloatVector, typed classes or lists of those).";
 
         return null;
     }

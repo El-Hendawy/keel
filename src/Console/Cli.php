@@ -56,6 +56,7 @@ final class Cli
           crypto:e2e-key    Print a new key pair for end-to-end message encryption [--kid=ID]
           orm:reencrypt <C> Rewrite an entity's #[Encrypted] columns with the current key
           ledger:verify     Check the ledger's hash chain
+          vector:info       Show which IntVector/FloatVector implementation is loaded and its SIMD level
 
           deploy:docker     Write a production Dockerfile (keel run, build in the image)
           deploy:kubernetes Write Deployment, Service, autoscaler and disruption budget
@@ -110,6 +111,7 @@ final class Cli
                 'crypto:e2e-key' => self::e2eKey($options['kid'] ?? gmdate('Y-m') . '-' . bin2hex(random_bytes(2))),
                 'orm:reencrypt' => self::reencrypt($appFile, $env, $arguments[0] ?? throw new \InvalidArgumentException('Usage: keel orm:reencrypt <Entity class>')),
                 'ledger:verify' => self::ledgerVerify($appFile, $env),
+                'vector:info' => self::vectorInfo(),
                 'version', '--version', '-V' => self::out(Keel::VERSION),
                 default => self::out(\sprintf(self::HELP, Keel::VERSION), $command === null || \in_array($command, ['help', '--help', '-h'], true) ? 0 : 1),
             };
@@ -261,6 +263,25 @@ final class Cli
         }
 
         return self::out("Re-encrypted $count row(s) of $class with the current key.");
+    }
+
+    private static function vectorInfo(): int
+    {
+        $native = \Keel\Vector\VectorInfo::isNative();
+        $php = PHP_VERSION . (PHP_ZTS ? ' ZTS' : ' NTS') . ', ' . php_uname('m');
+        $lines = [
+            'Implementation  ' . ($native ? 'keel_vector extension ' . \Keel\Vector\VectorInfo::version() : 'pure PHP (the keel_vector extension is not loaded)'),
+            'SIMD            ' . ($native ? \Keel\Vector\VectorInfo::simdLevel() : 'none'),
+            "PHP             $php",
+        ];
+        if (!$native) {
+            $lines[] = '';
+            $lines[] = 'IntVector and FloatVector work the same without it, only slower and with more memory.';
+            $lines[] = 'To use the extension: ' . \dirname(__DIR__, 2) . '/ext/keel_vector/build.sh, then add the';
+            $lines[] = 'extension= line it prints to php.ini (and reload PHP-FPM or restart `keel run`).';
+        }
+
+        return self::out(implode("\n", $lines));
     }
 
     private static function ledgerVerify(string $appFile, string $env): int

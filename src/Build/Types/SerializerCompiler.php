@@ -72,6 +72,7 @@ final class SerializerCompiler
             TypeInfo::DATETIME => $value . '->format(\DATE_RFC3339_EXTENDED)',
             TypeInfo::OBJECT => $this->object($type->classOrFail(), $value),
             TypeInfo::LIST => $this->list($type, $value, $depth),
+            TypeInfo::VECTOR => $value . '->toArray()',
         };
 
         if ($type->nullable && $plain !== $value) {

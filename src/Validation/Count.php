@@ -6,7 +6,7 @@ namespace Keel\Validation;
 
 use Attribute;
 
-/** Number of items in a list. */
+/** Number of items in a list or vector. */
 #[Attribute(Attribute::TARGET_PROPERTY | Attribute::TARGET_PARAMETER)]
 final readonly class Count implements Constraint
 {
@@ -16,7 +16,7 @@ final readonly class Count implements Constraint
 
     public function supports(string $kind): bool
     {
-        return $kind === 'list';
+        return $kind === 'list' || $kind === 'vector';
     }
 
     public function compile(string $value): string

@@ -57,6 +57,9 @@ final class ProductionChecks
         if (isset($app->manifest->bindings()[\Keel\NoSql\DocumentStore::class]) && ($config['nosql.store'] ?? 'memory') === 'memory') {
             $problems[] = 'DocumentStore uses the in-memory store: documents would vanish on restart and differ per worker. Set nosql.store.';
         }
+        if (($config['vector.require_native'] ?? false) === true && !\Keel\Vector\VectorInfo::isNative()) {
+            $problems[] = 'vector.require_native is set but the keel_vector extension is not loaded, so IntVector and FloatVector would run in pure PHP. Build it with ext/keel_vector/build.sh and add the extension= line it prints to php.ini (`keel vector:info` shows what is loaded).';
+        }
         $key = $config['app.key'] ?? '';
         if (!\is_string($key) || \strlen(\Keel\Security\Keys::decode($key)) < 32) {
             $problems[] = 'app.key is missing or shorter than 32 bytes: token fingerprints, signed cursors and Keel-issued JWTs would use a public development key. Generate one with `keel key:generate` and set it from a secret (e.g. APP_KEY).';

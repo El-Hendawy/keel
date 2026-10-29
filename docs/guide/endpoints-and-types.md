@@ -37,7 +37,8 @@ final readonly class CreateOrderInput
 ```
 
 - Supported field types: `string`, `int`, `float`, `bool`, backed enums, `DateTimeImmutable` (RFC 3339),
-  other input classes, and lists of any of those (`@var list<T>` or `#[ListOf(T::class)]`).
+  `IntVector` and `FloatVector` (a JSON array of numbers, see [vectors](vectors.md)), other input classes,
+  and lists of any of those (`@var list<T>` or `#[ListOf(T::class)]`).
 - A parameter without a default is required. `?T` allows `null`; it does not make the field optional.
 - Unknown fields are rejected with `unknown_field`.
 - JSON is strict (`"5"` is not an int). Query strings are coerced (`?limit=5`, `?active=true`).
@@ -52,7 +53,7 @@ final readonly class CreateOrderInput
 | `#[Pattern('/regex/', 'message')]` | string | `pattern` |
 | `#[Uuid]`, `#[Email]`, `#[Url]` | string | `uuid`, `email`, `url` |
 | `#[Range(min, max)]` | int, float | `range` |
-| `#[Count(min, max)]` | list | `count` |
+| `#[Count(min, max)]` | list, `IntVector`, `FloatVector` | `count` |
 | `#[Decimal(scale, positive)]` | string holding an exact decimal (`"12.50"`) | `decimal` |
 | `#[CurrencyCode]` | string (ISO 4217) | `currency` |
 | `#[Iban]`, `#[Bic]`, `#[CardNumber]` | string | `iban`, `bic`, `card_number` |

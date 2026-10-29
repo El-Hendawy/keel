@@ -177,6 +177,9 @@ final class OpenApiGenerator
             TypeInfo::ENUM => $this->enum($type->classOrFail()),
             TypeInfo::OBJECT => $this->reference($type->classOrFail(), $input),
             TypeInfo::LIST => ['type' => 'array', 'items' => $this->schema($type->item ?? new TypeInfo(TypeInfo::STRING), [], $input)],
+            TypeInfo::VECTOR => ['type' => 'array', 'items' => $type->class === \Keel\Vector\IntVector::class
+                ? ['type' => 'integer', 'format' => 'int64']
+                : ['type' => 'number', 'format' => 'double']],
         };
         foreach ($constraints as $constraint) {
             $schema += $constraint->schema();

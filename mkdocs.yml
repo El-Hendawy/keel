@@ -97,6 +97,7 @@ nav:
       - Encryption (at rest, end to end): guide/encryption.md
       - Money, ledgers and payments: guide/fintech.md
       - Non-relational databases: guide/nosql.md
+      - Numeric vectors: guide/vectors.md
       - Cache and pagination: guide/cache-and-pagination.md
       - Concurrency: guide/concurrency.md
       - TOON: guide/toon.md

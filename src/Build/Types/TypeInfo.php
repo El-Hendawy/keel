@@ -13,12 +13,14 @@ final readonly class TypeInfo
     public const string BOOL = 'bool';
     public const string ENUM = 'enum';
     public const string DATETIME = 'datetime';
+    /** Keel\Vector\IntVector or FloatVector: a JSON array of numbers. */
+    public const string VECTOR = 'vector';
     public const string OBJECT = 'object';
     public const string LIST = 'list';
 
     /**
      * @param self::* $kind
-     * @param class-string|null $class for enum, datetime and object kinds
+     * @param class-string|null $class for enum, datetime, vector and object kinds
      */
     public function __construct(
         public string $kind,
@@ -58,7 +60,7 @@ final readonly class TypeInfo
     {
         $base = match ($this->kind) {
             self::LIST => 'list<' . ($this->item?->describe() ?? 'mixed') . '>',
-            self::ENUM, self::OBJECT, self::DATETIME => (string) $this->class,
+            self::ENUM, self::OBJECT, self::DATETIME, self::VECTOR => (string) $this->class,
             default => $this->kind,
         };
 

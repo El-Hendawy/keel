@@ -112,6 +112,7 @@ from the API.
 | `keel crypto:e2e-key [--kid=ID]` | Prints a new P-256 key pair for end-to-end message encryption |
 | `keel orm:reencrypt <Entity class>` | Rewrites an entity's `#[Encrypted]` columns with the current key, after a rotation |
 | `keel ledger:verify` | Recomputes the ledger's hash chain; exits 1 and names the first bad transaction |
+| `keel vector:info` | Shows whether `IntVector`/`FloatVector` run on the keel_vector extension or in pure PHP, and the SIMD level |
 
 ## Background work
 

@@ -14,6 +14,12 @@ listed under **Breaking** with an upgrade note.
   encrypted to the client's key (`Keel-E2E-Key`), required per path, public keys at
   `/.well-known/keel-e2e-keys`, `keel crypto:e2e-key`; interoperable with JOSE libraries (tested against
   jwcrypto).
+- **Numeric vectors.** `Keel\Vector\IntVector` and `FloatVector`: contiguous 64-bit lists with exact,
+  overflow-checked integer arithmetic, fixed-order float sums, comparisons that return indices, gather, sort
+  and unique. The `keel_vector` extension (Rust, ext-php-rs, SIMD chosen at run time) runs them natively; a
+  pure-PHP implementation with the same classes and results is used otherwise. They are API types (JSON
+  arrays of numbers, `#[Count]`, OpenAPI), `keel vector:info` shows what is loaded, and
+  `vector.require_native` makes production require the extension.
 - **Money and ledgers.** `Money` (integer minor units, ISO 4217 scales, rounding modes, lossless
   allocation) as a domain and API type; constraints `Decimal`, `CurrencyCode`, `Iban`, `Bic`, `CardNumber`;
   `->withLedger()`: a double-entry ledger with balanced, idempotent postings, overdraft limits, reversals,
