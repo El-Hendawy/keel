@@ -163,6 +163,78 @@ jobs:
           KEEL_TEST_COUCHDB_URL: http://keel:keel-secret@127.0.0.1:5984
         run: vendor/bin/phpunit tests/NoSql
 
+  vector-extension:
+    # The keel_vector extension: Rust tests at every SIMD level the runner has, clippy, then the PHP
+    # contract and property suites with the pure-PHP implementation and with the extension, and the
+    # whole test suite with the extension loaded.
+    name: vector extension (${{ matrix.os }}, PHP ${{ matrix.php }}${{ matrix.ts == 'ts' && ' ZTS' || '' }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, php: '8.3' }
+          - { os: ubuntu-latest, php: '8.4' }
+          - { os: ubuntu-latest, php: '8.5' }
+          - { os: ubuntu-latest, php: '8.4', ts: ts }
+          - { os: ubuntu-24.04-arm, php: '8.3' }
+          - { os: ubuntu-24.04-arm, php: '8.4' }
+          - { os: ubuntu-24.04-arm, php: '8.5' }
+          - { os: macos-latest, php: '8.4' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, mbstring, pdo_sqlite
+          coverage: none
+        env:
+          phpts: ${{ matrix.ts || 'nts' }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ext/keel_vector
+      - run: composer install --no-interaction --no-progress
+      - name: Rust tests (debug and release)
+        run: make -C ext/keel_vector test
+      - name: Clippy
+        working-directory: ext/keel_vector
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Build
+        run: ext/keel_vector/build.sh
+      - name: Vector suites, pure-PHP implementation then the extension
+        run: make -C ext/keel_vector test-php
+      - name: Whole test suite with the extension
+        run: php -d extension=$PWD/ext/keel_vector/target/release/keel_vector.so vendor/bin/phpunit
+
+  vector-valgrind:
+    # The vector suites with the extension under valgrind: no invalid reads or writes, no use of
+    # uninitialised memory, no leaks through the extension.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring
+          coverage: none
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ext/keel_vector
+      - run: sudo apt-get update && sudo apt-get install -y valgrind
+      - run: composer install --no-interaction --no-progress
+      - name: Vector suites under valgrind
+        run: make -C ext/keel_vector valgrind
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: valgrind-log
+          path: ext/keel_vector/target/valgrind.log
+
   docs:
     runs-on: ubuntu-latest
     steps:

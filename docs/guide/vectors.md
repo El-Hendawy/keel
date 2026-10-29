@@ -56,6 +56,15 @@ production refuse to boot without it, set:
 'vector' => ['require_native' => true],
 ```
 
+`ext/keel_vector/README.md` has build steps for Linux (x86_64, aarch64) and macOS, php.ini and restart
+instructions, and the complete semantics. Two limitations matter in production:
+
+- **`memory_limit` does not count vector data.** The extension stores elements outside PHP's memory
+  manager, so `memory_limit` and `memory_get_usage()` don't see them. Limit sizes where data comes in
+  (`#[Count(max: ...)]` on API inputs), and use `memoryBytes()` to measure.
+- **Windows is not supported** (ext-php-rs needs nightly Rust there). Windows uses the pure-PHP
+  implementation.
+
 ## Performance
 
 `benchmarks/vectors.php` compares plain arrays, the pure-PHP vectors and the extension, and checks that

@@ -31,10 +31,15 @@ asan:
 		DYLD_INSERT_LIBRARIES=$$(rustc +nightly --print sysroot)/lib/rustlib/$(HOST)/lib/librustc-nightly_rt.asan.dylib \
 		$(PHP) -d extension=$(CURDIR)/target/asan/keel_vector.so $(SUITE)
 
-# The PHP suites under valgrind (Linux), with the release build.
+# The PHP suites under valgrind (Linux), with the release build. Fails on any memory error, and on a
+# leak whose allocation passed through the extension; PHP's own exit-time leaks are only reported.
 valgrind: build
-	KEEL_VECTOR_BACKEND=native USE_ZEND_ALLOC=0 ZEND_DONT_UNLOAD_MODULES=1 valgrind --error-exitcode=1 --leak-check=full \
-		--errors-for-leak-kinds=definite $(PHP) -d extension=$(EXTENSION) $(SUITE)
+	KEEL_VECTOR_BACKEND=native USE_ZEND_ALLOC=0 ZEND_DONT_UNLOAD_MODULES=1 valgrind --error-exitcode=1 \
+		--leak-check=full --errors-for-leak-kinds=none --num-callers=40 --log-file=target/valgrind.log \
+		$(PHP) -d extension=$(EXTENSION) $(SUITE)
+	@grep -E 'ERROR SUMMARY|definitely lost:|indirectly lost:' target/valgrind.log
+	@if grep -A40 'are definitely lost in' target/valgrind.log | grep -q keel_vector; then \
+		echo 'valgrind: memory allocated through keel_vector leaked; see target/valgrind.log' >&2; exit 1; fi
 
 clean:
 	cargo clean

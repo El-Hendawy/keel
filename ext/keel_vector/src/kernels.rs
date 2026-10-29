@@ -463,7 +463,7 @@ pub fn range_f64(start: f64, end: f64, step: f64) -> Option<Vec<f64>> {
         return None;
     }
     let count = ((end - start).abs() / step.abs() + 1e-9).floor() + 1.0;
-    if !(count < (isize::MAX as f64 / 8.0)) {
+    if count.is_nan() || count >= isize::MAX as f64 / 8.0 {
         return None;
     }
     let count = count as usize;

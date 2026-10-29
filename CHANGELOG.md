@@ -23,6 +23,8 @@ listed under **Breaking** with an upgrade note.
   Both implementations pass one contract suite and property tests against PHP's array functions; the
   kernels are tested at every SIMD level against a scalar reference, and under AddressSanitizer.
   `benchmarks/vectors.php` compares them with plain arrays (results in `benchmarks/RESULTS.md`).
+  CI builds and tests the extension on Linux x86_64 and aarch64 (PHP 8.3–8.5, and ZTS) and macOS, runs
+  clippy, and runs the vector suites under valgrind.
 - **Money and ledgers.** `Money` (integer minor units, ISO 4217 scales, rounding modes, lossless
   allocation) as a domain and API type; constraints `Decimal`, `CurrencyCode`, `Iban`, `Bic`, `CardNumber`;
   `->withLedger()`: a double-entry ledger with balanced, idempotent postings, overdraft limits, reversals,
